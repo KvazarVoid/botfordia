@@ -5,7 +5,9 @@ import random
 import re
 import ssl
 import certifi
-from config import TOKEN
+import os
+
+TOKEN = os.getenv("TOKEN")
 
 ssl._create_default_https_context = lambda: ssl.create_default_context(
     cafile=certifi.where()
