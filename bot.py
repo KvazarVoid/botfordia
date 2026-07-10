@@ -85,7 +85,6 @@ async def dice(message):
             break
 
     if mode:
-                # 📌 сколько раз крутить
         parts = text.split()
         count = 1
 
@@ -99,7 +98,6 @@ async def dice(message):
 
         ping = await get_ping(message, api)
 
-        # 📌 группировка результатов
         groups = defaultdict(list)
 
         for _ in range(count):
@@ -120,7 +118,6 @@ async def dice(message):
 
             groups[result_text].append(roll)
 
-        # 📌 красивый вывод
         output = []
 
         order = [
@@ -180,7 +177,6 @@ async def dice(message):
 
         mod_text = f"+{modifier}" if modifier >= 0 else str(modifier)
 
-        # 🎯 логика результата
         if total <= 20:
             result_text = "Мои соболезнования."
         elif total > 20:
@@ -234,7 +230,4 @@ async def dice(message):
     f"[ {rolls_text}{mod_text} ]\n"
     f"Σ = {total}"
 )
-
-    
-    
 bot.run()
