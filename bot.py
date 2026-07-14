@@ -100,6 +100,14 @@ def update_sheet(text):
                 print(f"Обновляю строку {row}: {tag}")
                 sheet.update_cell(row, 4, today)
 
+def days_text(days):
+    if days % 10 == 1 and days % 100 != 11:
+        return f"{days} день"
+    elif days % 10 in (2, 3, 4) and not (12 <= days % 100 <= 14):
+        return f"{days} дня"
+    else:
+        return f"{days} дней"
+    
 def get_deadlines(user_tag=None):
     tags = sheet.col_values(1)[1:]      # A — теги дедлайнов
     users = sheet.col_values(3)[1:]     # C — теги людей
@@ -129,17 +137,17 @@ def get_deadlines(user_tag=None):
             text = "сегодня"
         elif days == 1:
             emoji = "🟩"
-            text = "1 день"
+            text = days_text(days)
         elif days == 2:
             emoji = "🟨"
-            text = "2 дня"
+            text = days_text(days)
         elif days == 3:
             emoji = "🟥"
-            text = "3 дня"
+            text = days_text(days)
         else:
             emoji = "⛔"
-            text = f"{days} дней"
-
+            text = days_text(days)
+            
         deadlines.append(
             (days, f"{emoji} {tag} — {last_date.strftime('%d.%m.%Y')} ({text})")
         )
