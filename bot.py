@@ -5,7 +5,12 @@ import random
 import re
 import ssl
 import certifi
-from config import TOKEN
+import os
+import gspread
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+TOKEN = os.getenv("TOKEN")
 
 ssl._create_default_https_context = lambda: ssl.create_default_context(
     cafile=certifi.where()
@@ -41,8 +46,14 @@ tarot_cards = {
 
 bot = Bot(TOKEN)
 api = API(TOKEN)
+gc = gspread.service_account(filename="credentials.json")
+sheet = gc.open_by_key("139vYcH0C77e1sOWMr68G125__J8QevYXCu_r3LegCtM").sheet1
+ALLOWED_USERS = {
+    149041734,  # VK ID Алиса
+}
 
 print("БОТ ЗАПУЩЕН")
+
 
 async def get_ping(message, api):
     reply = message.reply_message
@@ -57,9 +68,32 @@ async def get_ping(message, api):
 
     return f"[id{user_id}|{name}]"
 
+#Хрень с таблицами
+def update_sheet(text):
+    tags = re.findall(r"#[A-Za-zА-Яа-яЁё0-9_]+", text)
+    print(tags)
+    print("Найдены теги:", tags)
+
+    if not tags:
+        return
+
+    values = sheet.col_values(1)[1:]  # весь A, начиная со второй строки
+    print("Теги из таблицы:", values)
+
+    today = datetime.now().strftime("%d.%m.%Y")
+
+    for tag in tags:
+        for row, value in enumerate(values, start=2):
+            if value == tag:
+                print(f"Обновляю строку {row}: {tag}")
+                sheet.update_cell(row, 4, today)
+
 @bot.on.message()
 async def dice(message):
+    print(message.from_id)
     text = message.text.lower().strip()
+    if message.from_id in ALLOWED_USERS:
+        update_sheet(message.text)
     commands = {
         "/магнус": "Предатель*",
         "/пасхалко": "Пасхалко",
@@ -83,7 +117,6 @@ async def dice(message):
             break
 
     if mode:
-                # 📌 сколько раз крутить
         parts = text.split()
         count = 1
 
@@ -97,7 +130,6 @@ async def dice(message):
 
         ping = await get_ping(message, api)
 
-        # 📌 группировка результатов
         groups = defaultdict(list)
 
         for _ in range(count):
@@ -118,7 +150,6 @@ async def dice(message):
 
             groups[result_text].append(roll)
 
-        # 📌 красивый вывод
         output = []
 
         order = [
@@ -178,7 +209,6 @@ async def dice(message):
 
         mod_text = f"+{modifier}" if modifier >= 0 else str(modifier)
 
-        # 🎯 логика результата
         if total <= 20:
             result_text = "Мои соболезнования."
         elif total > 20:
@@ -195,44 +225,40 @@ async def dice(message):
         return
     text = message.text.lower().strip()
 
-    match = re.fullmatch(r"/(\d*)к(\d+)([+-]\d+)?", text)
+    match = re.fullmatch(r"/(\d*)(?:к|d|д)(\d+)([+-]\d+)?", text)
 
-    if not match:
-        return
+    if match:
 
-    count = int(match.group(1) or 1)
-    MAX_DICE = 10
-    if count > MAX_DICE:
-        await message.answer(f"Много хочешь (макс {MAX_DICE})")
-        return
-    sides = int(match.group(2))
-    modifier = int(match.group(3) or 0)
+        count = int(match.group(1) or 1)
+        MAX_DICE = 10
+        if count > MAX_DICE:
+            await message.answer(f"Много хочешь (макс {MAX_DICE})")
+            return
+        sides = int(match.group(2))
+        modifier = int(match.group(3) or 0)
 
-    rolls = [random.randint(1, sides) for _ in range(count)]
-    total = sum(rolls) + modifier
+        rolls = [random.randint(1, sides) for _ in range(count)]
+        total = sum(rolls) + modifier
 
-    rolls_text = " + ".join(map(str, rolls))
+        rolls_text = " + ".join(map(str, rolls))
 
-    mod_text = ""
-    if modifier:
-        sign = "+ " if modifier > 0 else ""
-        mod_text = f" {sign}{modifier}"
-    reply = message.reply_message
+        mod_text = ""
+        if modifier:
+            sign = "+ " if modifier > 0 else ""
+            mod_text = f" {sign}{modifier}"
+        reply = message.reply_message
 
-    if reply:
-        user_id = reply.from_id
-    else:
-        user_id = message.from_id
+        if reply:
+            user_id = reply.from_id
+        else:
+            user_id = message.from_id
 
-    ping = await get_ping(message, api)
+        ping = await get_ping(message, api)
 
-    await message.answer(
-    f"{ping}\n"
-    f"🎲 {count}к{sides}\n"
-    f"[ {rolls_text}{mod_text} ]\n"
-    f"Σ = {total}"
+        await message.answer(
+        f"{ping}\n"
+        f"🎲 {count}к{sides}\n"
+        f"[ {rolls_text}{mod_text} ]\n"
+        f"Σ = {total}"
 )
-
-    
-    
 bot.run()

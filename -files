@@ -1,0 +1,208 @@
+[33mcommit efa3975141ee1560df4974533b1c98a709c37e1e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m
+Author: KvazarVoid <besiegevcool@gmail.com>
+Date:   Fri Jun 19 09:11:06 2026 +0300
+
+    Bot v1
+
+[1mdiff --git a/.gitignore b/.gitignore[m
+[1mnew file mode 100644[m
+[1mindex 0000000..865617d[m
+[1m--- /dev/null[m
+[1m+++ b/.gitignore[m
+[36m@@ -0,0 +1,15 @@[m
+[32m+[m[32mconfig.py[m
+[32m+[m
+[32m+[m
+[32m+[m[32mvenv/[m
+[32m+[m[32m.venv/[m
+[32m+[m
+[32m+[m[32m__pycache__/[m
+[32m+[m[32m*.pyc[m
+[32m+[m[32m*.pyo[m
+[32m+[m
+[32m+[m[32m.vscode/[m
+[32m+[m[32m.idea/[m
+[32m+[m
+[32m+[m[32m*.log[m
+[32m+[m[32m.vkbottle/[m
+\ No newline at end of file[m
+[1mdiff --git a/bot.py b/bot.py[m
+[1mnew file mode 100644[m
+[1mindex 0000000..3e0ba36[m
+[1m--- /dev/null[m
+[1m+++ b/bot.py[m
+[36m@@ -0,0 +1,238 @@[m
+[32m+[m[32mfrom vkbottle.bot import Bot[m
+[32m+[m[32mfrom vkbottle import API[m
+[32m+[m[32mfrom collections import defaultdict[m
+[32m+[m[32mimport random[m
+[32m+[m[32mimport re[m
+[32m+[m[32mimport ssl[m
+[32m+[m[32mimport certifi[m
+[32m+[m[32mfrom config import TOKEN[m
+[32m+[m
+[32m+[m[32mssl._create_default_https_context = lambda: ssl.create_default_context([m
+[32m+[m[32m    cafile=certifi.where()[m
+[32m+[m[32m)[m
+[32m+[m
+[32m+[m
+[32m+[m[32mtarot_cards = {[m
+[32m+[m[32m    1: "Маг",[m
+[32m+[m[32m    2: "Верховная Жрица",[m
+[32m+[m[32m    3: "Императрица",[m
+[32m+[m[32m    4: "Император",[m
+[32m+[m[32m    5: "Иерофант",[m
+[32m+[m[32m    6: "Влюблённые",[m
+[32m+[m[32m    7: "Колесница",[m
+[32m+[m[32m    8: "Сила",[m
+[32m+[m[32m    9: "Отшельник",[m
+[32m+[m[32m    10: "Колесо Фортуны",[m
+[32m+[m[32m    11: "Справедливость",[m
+[32m+[m[32m    12: "Повешенный",[m
+[32m+[m[32m    13: "Смерть",[m
+[32m+[m[32m    14: "Умеренность",[m
+[32m+[m[32m    15: "Дьявол",[m
+[32m+[m[32m    16: "Башня",[m
+[32m+[m[32m    17: "Звезда",[m
+[32m+[m[32m    18: "Луна",[m
+[32m+[m[32m    19: "Солнце",[m
+[32m+[m[32m    20: "Суд",[m
+[32m+[m[32m    21: "Мир",[m
+[32m+[m[32m    22: "Дурак",[m
+[32m+[m[32m    23: "Младшая Аркана",[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m
+[32m+[m[32mbot = Bot(TOKEN)[m
+[32m+[m[32mapi = API(TOKEN)[m
+[32m+[m
+[32m+[m[32mprint("БОТ ЗАПУЩЕН")[m
+[32m+[m
+[32m+[m[32masync def get_ping(message, api):[m
+[32m+[m[32m    reply = message.reply_message[m
+[32m+[m
+[32m+[m[32m    if reply:[m
+[32m+[m[32m        user_id = reply.from_id[m
+[32m+[m[32m    else:[m
+[32m+[m[32m        user_id = message.from_id[m
+[32m+[m
+[32m+[m[32m    user = await api.users.get(user_ids=user_id)[m
+[32m+[m[32m    name = user[0].first_name[m
+[32m+[m
+[32m+[m[32m    return f"[id{user_id}|{name}]"[m
+[32m+[m
+[32m+[m[32m@bot.on.message()[m
+[32m+[m[32masync def dice(message):[m
+[32m+[m[32m    text = message.text.lower().strip()[m
+[32m+[m[32m    commands = {[m
+[32m+[m[32m        "/магнус": "Предатель*",[m
+[32m+[m[32m        "/пасхалко": "Пасхалко",[m
+[32m+[m[32m        "/фумо": "https://ru.wikipedia.org/wiki/Смысл_жизни",[m
+[32m+[m[32m        "/диа": "ЛУЧШАЯ РОЛЕВАЯ В МИРЕ\nЛУЧШАЯ РОЛЕВАЯ В МИРЕ\nЛУЧШАЯ РОЛЕВАЯ В МИРЕ",[m
+[32m+[m[32m}[m[41m    [m
+[32m+[m[32m    casino_commands = {[m
+[32m+[m[32m        "/казино": "normal",[m
+[32m+[m[32m        "/деп": "deposit",[m
+[32m+[m[32m        "/slot": "slot"[m
+[32m+[m[32m    }[m
+[32m+[m[32m    if text in commands:[m
+[32m+[m[32m        await message.answer(commands[text])[m
+[32m+[m[32m        return[m
+[32m+[m
+[32m+[m[32m    mode = None[m
+[32m+[m
+[32m+[m[32m    for cmd in casino_commands:[m
+[32m+[m[32m        if text.startswith(cmd):[m
+[32m+[m[32m            mode = casino_commands[cmd][m
+[32m+[m[32m            break[m
+[32m+[m
+[32m+[m[32m    if mode:[m
+[32m+[m[32m                # 📌 сколько раз крутить[m
+[32m+[m[32m        parts = text.split()[m
+[32m+[m[32m        count = 1[m
+[32m+[m
+[32m+[m[32m        if len(parts) > 1 and parts[1].isdigit():[m
+[32m+[m[32m            count = int(parts[1])[m
+[32m+[m
+[32m+[m[32m        MAX_ROLLS = 50[m
+[32m+[m[32m        if count > MAX_ROLLS:[m
+[32m+[m[32m            await message.answer(f"Слишком много попыток (макс {MAX_ROLLS})")[m
+[32m+[m[32m            return[m
+[32m+[m
+[32m+[m[32m        ping = await get_ping(message, api)[m
+[32m+[m
+[32m+[m[32m        # 📌 группировка результатов[m
+[32m+[m[32m        groups = defaultdict(list)[m
+[32m+[m
+[32m+[m[32m        for _ in range(count):[m
+[32m+[m[32m            roll = random.randint(1, 1000)[m
+[32m+[m
+[32m+[m[32m            if roll <= 5:[m
+[32m+[m[32m                result_text = "!!!Легендарка!!!"[m
+[32m+[m[32m            elif roll <= 25:[m
+[32m+[m[32m                result_text = "Эпическая Аркана"[m
+[32m+[m[32m            elif roll <= 100:[m
+[32m+[m[32m                result_text = "Редкая Аркана"[m
+[32m+[m[32m            elif roll <= 250:[m
+[32m+[m[32m                result_text = "Базовая Аркана"[m
+[32m+[m[32m            elif roll <= 501:[m
+[32m+[m[32m                result_text = "4 ОР"[m
+[32m+[m[32m            else:[m
+[32m+[m[32m                result_text = "Целое нихуя"[m
+[32m+[m
+[32m+[m[32m            groups[result_text].append(roll)[m
+[32m+[m
+[32m+[m[32m        # 📌 красивый вывод[m
+[32m+[m[32m        output = [][m
+[32m+[m
+[32m+[m[32m        order = [[m
+[32m+[m[32m            "!!!Легендарка!!!",[m
+[32m+[m[32m            "Эпическая Аркана",[m
+[32m+[m[32m            "Редкая Аркана",[m
+[32m+[m[32m            "Базовая Аркана",[m
+[32m+[m[32m            "4 ОР",[m
+[32m+[m[32m            "Целое нихуя"[m
+[32m+[m[32m        ][m
+[32m+[m
+[32m+[m[32m        for name in order:[m
+[32m+[m[32m            if name in groups:[m
+[32m+[m[32m                rolls = groups[name][m
+[32m+[m[32m                output.append([m
+[32m+[m[32m                    f"{len(rolls)}x {name} ({', '.join(map(str, rolls))})"[m
+[32m+[m[32m                )[m
+[32m+[m
+[32m+[m[32m        await message.answer([m
+[32m+[m[32m            f"{ping}\n"[m
+[32m+[m[32m            f"Казино x{count}:\n\n" +[m
+[32m+[m[32m            "\n".join(output)[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        return[m
+[32m+[m[32m    if text == "/расклад":[m
+[32m+[m
+[32m+[m[32m        results = [][m
+[32m+[m
+[32m+[m[32m        rolls = random.sample(range(1, 24), 3)[m
+[32m+[m
+[32m+[m[32m        for roll in rolls:[m
+[32m+[m[32m            card = tarot_cards.get(roll, "Неизвестная карта")[m
+[32m+[m[32m            results.append(f"{roll} — {card}")[m
+[32m+[m[32m        ping = await get_ping(message, api)[m
+[32m+[m[32m        await message.answer([m
+[32m+[m[32m            f"{ping}\n"[m
+[32m+[m[32m            f"🃏 Карты:\n" +[m
+[32m+[m[32m            "\n".join(results)[m
+[32m+[m[32m        )[m
+[32m+[m[32m        return[m
+[32m+[m[32m    if text.startswith("/смерть"):[m
+[32m+[m
+[32m+[m[32m        parts = text.split()[m
+[32m+[m
+[32m+[m[32m        # модификатор (по умолчанию 0)[m
+[32m+[m[32m        modifier = 0[m
+[32m+[m
+[32m+[m[32m        if len(parts) > 1:[m
+[32m+[m[32m            try:[m
+[32m+[m[32m                modifier = int(parts[1])[m
+[32m+[m[32m            except ValueError:[m
+[32m+[m[32m             
