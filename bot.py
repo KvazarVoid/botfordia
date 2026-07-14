@@ -145,7 +145,7 @@ def get_deadlines(user_tag=None):
             emoji = "🟥"
             text = days_text(days)
         else:
-            emoji = "⛔"
+            emoji = "⬛"
             text = days_text(days)
 
         deadlines.append(
