@@ -226,6 +226,7 @@ async def dice(message):
     text = message.text.lower().strip()
 
     match = re.fullmatch(r"/(\d*)(?:к|d|д)(\d+)([+-]\d+)?", text)
+    match = re.fullmatch(r"/(\d*)(?:к|d|д)(\d+)([+-]\d+)?", text)
 
     if match:
 
