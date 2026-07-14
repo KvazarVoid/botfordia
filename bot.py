@@ -100,6 +100,54 @@ def update_sheet(text):
                 print(f"Обновляю строку {row}: {tag}")
                 sheet.update_cell(row, 4, today)
 
+def get_deadlines(user_tag=None):
+    tags = sheet.col_values(1)[1:]      # A — теги дедлайнов
+    users = sheet.col_values(3)[1:]     # C — теги людей
+    dates = sheet.col_values(4)[1:]     # D — даты
+
+    today = datetime.now().date()
+
+    deadlines = []
+
+    for tag, user, date_text in zip(tags, users, dates):
+        if not tag or not date_text:
+            continue
+
+        # Если указан пользователь — пропускаем чужие строки
+        if user_tag and user_tag not in user:
+             continue
+
+        try:
+            last_date = datetime.strptime(date_text, "%d.%m.%Y").date()
+        except ValueError:
+            continue
+
+        days = (today - last_date).days
+
+        if days <= 0:
+            emoji = "🟦"
+            text = "сегодня"
+        elif days == 1:
+            emoji = "🟩"
+            text = "1 день"
+        elif days == 2:
+            emoji = "🟨"
+            text = "2 дня"
+        elif days == 3:
+            emoji = "🟥"
+            text = "3 дня"
+        else:
+            emoji = "⛔"
+            text = f"{days} дней"
+
+        deadlines.append(
+            (days, f"{emoji} {tag} — {last_date.strftime('%d.%m.%Y')} ({text})")
+        )
+
+    deadlines.sort(reverse=True)
+
+    return "\n".join(item[1] for item in deadlines)
+
 @bot.on.message()
 async def dice(message):
     print(message.from_id)
@@ -112,6 +160,7 @@ async def dice(message):
         "/фумо": "https://ru.wikipedia.org/wiki/Смысл_жизни",
         "/диа": "ЛУЧШАЯ РОЛЕВАЯ В МИРЕ\nЛУЧШАЯ РОЛЕВАЯ В МИРЕ\nЛУЧШАЯ РОЛЕВАЯ В МИРЕ",
 }    
+    
     casino_commands = {
         "/казино": "normal",
         "/деп": "deposit",
@@ -203,6 +252,18 @@ async def dice(message):
             "\n".join(results)
         )
         return
+    
+    if text.startswith("/дедлайн"):
+        args = text.split()
+
+        if len(args) > 1:
+            user_tag = args[1]
+            result = get_deadlines(user_tag)
+        else:
+            result = get_deadlines()
+
+        await message.answer(result)
+    
     if text.startswith("/смерть"):
 
         parts = text.split()
