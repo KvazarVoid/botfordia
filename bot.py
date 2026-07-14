@@ -8,7 +8,8 @@ import certifi
 import os
 import gspread
 from datetime import datetime
-from zoneinfo import ZoneInfo
+import json
+from google.oauth2.service_account import Credentials
 
 TOKEN = os.getenv("TOKEN")
 
@@ -46,7 +47,18 @@ tarot_cards = {
 
 bot = Bot(TOKEN)
 api = API(TOKEN)
-gc = gspread.service_account(filename="credentials.json")
+if os.path.exists("credentials.json"):
+    gc = gspread.service_account(filename="credentials.json")
+else:
+    creds_dict = json.loads(os.environ["GOOGLE_CREDENTIALS"])
+    creds = Credentials.from_service_account_info(
+        creds_dict,
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive",
+        ],
+    )
+    gc = gspread.authorize(creds)
 sheet = gc.open_by_key("139vYcH0C77e1sOWMr68G125__J8QevYXCu_r3LegCtM").sheet1
 ALLOWED_USERS = {
     149041734,  # VK ID Алиса
