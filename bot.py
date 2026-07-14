@@ -76,7 +76,7 @@ async def get_ping(message, api):
         user_id = message.from_id
 
     user = await api.users.get(user_ids=user_id)
-    name = user[0].first_name
+    name = f"{user[0].first_name} {user[0].last_name}"
 
     return f"[id{user_id}|{name}]"
 
@@ -147,7 +147,7 @@ def get_deadlines(user_tag=None):
         else:
             emoji = "⛔"
             text = days_text(days)
-            
+
         deadlines.append(
             (days, f"{emoji} {tag} — {last_date.strftime('%d.%m.%Y')} ({text})")
         )
