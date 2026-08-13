@@ -63,10 +63,6 @@ spreadsheet = gc.open_by_key("139vYcH0C77e1sOWMr68G125__J8QevYXCu_r3LegCtM")
 
 sheet = spreadsheet.sheet1
 technical_sheet = spreadsheet.worksheet("Технический")
-ALLOWED_USERS = {
-    149041734,  # VK ID Алиса
-    615713136,  # VK ID Скуфа
-}
 
 print("БОТ ЗАПУЩЕН")
 
@@ -129,20 +125,29 @@ async def update_player_response(message):
         admin_post = row[2].strip()
         player_post = row[3].strip()
 
+        print(
+            "ПРОВЕРКА СТРОКИ:",
+            tag,
+            player,
+            admin_post,
+            player_post
+        )
+
         # Этот тег не указан в сообщении игрока
         if tag not in message_tags:
+            print("ПРОПУСК: неверный тег")
             continue
 
-        # Это не этот игрок
         if player != player_tag:
+            print("ПРОПУСК: неверный игрок")
             continue
 
-        # Для этого тега ещё не было нового поста админа
         if not admin_post:
+            print("ПРОПУСК: нет поста админа")
             continue
 
-        # Уже ответил на этот пост
         if player_post:
+            print("ПРОПУСК: игрок уже ответил")
             continue
 
         technical_sheet.update_cell(
@@ -155,7 +160,7 @@ async def update_player_response(message):
             f"Игрок {player_tag} ответил "
             f"в ветке {tag}: {response_time}"
         )
-        
+
 def parse_players(user_text):
     """
     Получает содержимое C и возвращает список VK-тегов игроков.
@@ -202,8 +207,25 @@ def sync_technical_tag(tag, players, admin_post_time):
                 value_input_option="USER_ENTERED"
             )
 
+def get_admin_ids():
+    admin_values = sheet.col_values(6)[1:]  # F — админы
 
-def update_sheet(text):
+    admin_ids = set()
+
+    for value in admin_values:
+        value = value.strip()
+
+        if not value:
+            continue
+
+        try:
+            admin_ids.add(int(value))
+        except ValueError:
+            continue
+
+    return admin_ids
+
+def update_sheet(text, admin_id):
     tags = re.findall(r"#[A-Za-zА-Яа-яЁё0-9_]+", text)
 
     print("Найдены теги:", tags)
@@ -212,6 +234,7 @@ def update_sheet(text):
         return
 
     values = sheet.col_values(1)[1:]  # A, начиная со второй строки
+    admin_values = sheet.col_values(6)[1:]  # F — админы
 
     today = datetime.now().strftime("%d.%m.%Y")
     admin_post_time = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
@@ -219,6 +242,14 @@ def update_sheet(text):
     for tag in tags:
         for row, value in enumerate(values, start=2):
             if value != tag:
+                continue
+            row_admin = admin_values[row - 2].strip()
+
+            if row_admin != str(admin_id):
+                print(
+                    f"Тег {tag} принадлежит админу {row_admin}, "
+                    f"а сообщение пришло от {admin_id}"
+                )
                 continue
 
             print(f"Обновляю строку {row}: {tag}")
@@ -245,6 +276,51 @@ def days_text(days):
         return f"{days} дня"
     else:
         return f"{days} дней"
+    
+def all_players_answered(tag):
+    values = technical_sheet.get_all_values()
+
+    found_players = False
+
+    for row in values[1:]:
+        if len(row) < 4:
+            continue
+
+        row_tag = row[0].strip()
+        admin_post = row[2].strip()
+        player_post = row[3].strip()
+
+        if row_tag != tag:
+            continue
+
+        # Тег ещё ни разу не запускался новой записью админа
+        if not admin_post:
+            continue
+
+        found_players = True
+
+        # Этот игрок ещё не ответил
+        if not player_post:
+            return False
+
+        # Если ответ игрока старее поста админа,
+        # значит это старый ответ
+        try:
+            admin_time = datetime.strptime(
+                admin_post,
+                "%d.%m.%Y %H:%M:%S"
+            )
+            player_time = datetime.strptime(
+                player_post,
+                "%d.%m.%Y %H:%M:%S"
+            )
+        except ValueError:
+            return False
+
+        if player_time <= admin_time:
+            return False
+
+    return found_players
     
 def get_deadlines(user_tag=None):
     tags = sheet.col_values(1)[1:]      # A — теги дедлайнов
@@ -286,8 +362,10 @@ def get_deadlines(user_tag=None):
             emoji = "⬛"
             text = days_text(days)
 
+        status = " 🟢" if all_players_answered(tag) else ""
+
         deadlines.append(
-            (days, f"{emoji} {tag} — {last_date.strftime('%d.%m.%Y')} ({text})")
+            (days, f"{emoji} {tag} — {last_date.strftime('%d.%m.%Y')} ({text}){status}")
         )
 
     deadlines.sort(reverse=True)
@@ -300,8 +378,10 @@ async def dice(message):
 
     text = message.text.lower().strip()
 
-    if message.from_id in ALLOWED_USERS:
-        update_sheet(message.text)
+    admin_ids = get_admin_ids()
+
+    if message.from_id in admin_ids:
+        update_sheet(message.text, message.from_id)
     else:
         await update_player_response(message)
 
@@ -387,6 +467,10 @@ async def dice(message):
         )
 
         return
+    if text == "/тестответ":
+        print("АЙЛА:", all_players_answered("#Айла"))
+        return
+    
     if text == "/расклад":
 
         results = []
