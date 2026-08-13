@@ -59,9 +59,13 @@ else:
         ],
     )
     gc = gspread.authorize(creds)
-sheet = gc.open_by_key("139vYcH0C77e1sOWMr68G125__J8QevYXCu_r3LegCtM").sheet1
+spreadsheet = gc.open_by_key("139vYcH0C77e1sOWMr68G125__J8QevYXCu_r3LegCtM")
+
+sheet = spreadsheet.sheet1
+technical_sheet = spreadsheet.worksheet("Технический")
 ALLOWED_USERS = {
     149041734,  # VK ID Алиса
+    615713136,  # VK ID Скуфа
 }
 
 print("БОТ ЗАПУЩЕН")
@@ -80,26 +84,160 @@ async def get_ping(message, api):
 
     return f"[id{user_id}|{name}]"
 
-#Хрень с таблицами
+async def get_user_tag(user_id):
+    users = await api.users.get(
+        user_ids=[user_id],
+        fields=["screen_name"]
+    )
+
+    if not users:
+        return None
+
+    screen_name = users[0].screen_name
+
+    if not screen_name:
+        return None
+
+    return f"@{screen_name}"
+
+async def update_player_response(message):
+    player_tag = await get_user_tag(message.from_id)
+
+    print("ТЕГ ИГРОКА:", player_tag)
+
+    if not player_tag:
+        return
+
+    # Ищем теги именно в сообщении игрока
+    message_tags = re.findall(r"#[A-Za-zА-Яа-яЁё0-9_]+", message.text or "")
+
+    print("ТЕГИ В СООБЩЕНИИ ИГРОКА:", message_tags)
+
+    if not message_tags:
+        return
+
+    values = technical_sheet.get_all_values()
+
+    response_time = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+
+    for row_index, row in enumerate(values[1:], start=2):
+        if len(row) < 4:
+            continue
+
+        tag = row[0].strip()
+        player = row[1].strip()
+        admin_post = row[2].strip()
+        player_post = row[3].strip()
+
+        # Этот тег не указан в сообщении игрока
+        if tag not in message_tags:
+            continue
+
+        # Это не этот игрок
+        if player != player_tag:
+            continue
+
+        # Для этого тега ещё не было нового поста админа
+        if not admin_post:
+            continue
+
+        # Уже ответил на этот пост
+        if player_post:
+            continue
+
+        technical_sheet.update_cell(
+            row_index,
+            4,
+            response_time
+        )
+
+        print(
+            f"Игрок {player_tag} ответил "
+            f"в ветке {tag}: {response_time}"
+        )
+        
+def parse_players(user_text):
+    """
+    Получает содержимое C и возвращает список VK-тегов игроков.
+    Например:
+    '@ivan, @petr'
+    -> ['@ivan', '@petr']
+    """
+    return re.findall(r"@[A-Za-zА-Яа-яЁё0-9_.]+", user_text or "")
+
+
+def sync_technical_tag(tag, players, admin_post_time):
+    """
+    Синхронизирует игроков тега с листом 'Технический'
+    и записывает новый пост админа.
+    """
+    values = technical_sheet.get_all_values()
+
+    existing_rows = {}
+
+    for row_index, row in enumerate(values[1:], start=2):
+        if len(row) < 2:
+            continue
+
+        row_tag = row[0].strip()
+        player = row[1].strip()
+
+        if row_tag == tag and player:
+            existing_rows[player] = row_index
+
+    for player in players:
+        if player in existing_rows:
+            row = existing_rows[player]
+
+            # Новый пост админа:
+            # обновляем время и обязательно очищаем старый ответ игрока.
+            technical_sheet.update(
+                f"C{row}:D{row}",
+                [[admin_post_time, ""]],
+            )
+
+        else:
+            technical_sheet.append_row(
+                [tag, player, admin_post_time, ""],
+                value_input_option="USER_ENTERED"
+            )
+
+
 def update_sheet(text):
     tags = re.findall(r"#[A-Za-zА-Яа-яЁё0-9_]+", text)
-    print(tags)
+
     print("Найдены теги:", tags)
 
     if not tags:
         return
 
-    values = sheet.col_values(1)[1:]  # весь A, начиная со второй строки
-    print("Теги из таблицы:", values)
+    values = sheet.col_values(1)[1:]  # A, начиная со второй строки
 
     today = datetime.now().strftime("%d.%m.%Y")
+    admin_post_time = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
 
     for tag in tags:
         for row, value in enumerate(values, start=2):
-            if value == tag:
-                print(f"Обновляю строку {row}: {tag}")
-                sheet.update_cell(row, 4, today)
+            if value != tag:
+                continue
 
+            print(f"Обновляю строку {row}: {tag}")
+
+            # Старая система дедлайнов
+            sheet.update_cell(row, 4, today)
+
+            # Получаем игроков из C
+            player_text = sheet.cell(row, 3).value
+            players = parse_players(player_text)
+
+            print(f"Игроки для {tag}: {players}")
+
+            # Обновляем технический лист
+            sync_technical_tag(
+                tag,
+                players,
+                admin_post_time
+            )
 def days_text(days):
     if days % 10 == 1 and days % 100 != 11:
         return f"{days} день"
@@ -159,9 +297,14 @@ def get_deadlines(user_tag=None):
 @bot.on.message()
 async def dice(message):
     print(message.from_id)
+
     text = message.text.lower().strip()
+
     if message.from_id in ALLOWED_USERS:
         update_sheet(message.text)
+    else:
+        await update_player_response(message)
+
     commands = {
         "/магнус": "Предатель*",
         "/пасхалко": "Пасхалко",
