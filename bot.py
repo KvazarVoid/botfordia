@@ -13,7 +13,7 @@ from google.oauth2.service_account import Credentials
 
 TOKEN = os.getenv("TOKEN")
 TAGS_CHAT_ID = 2000000004
-STATS_FILE = "app/data/messages_stats.json"
+STATS_FILE = "/app/data/messages_stats.json"
 tracked_tags = set()
 last_tags_update = 0
 TAGS_UPDATE_INTERVAL = 6 * 60 * 60
