@@ -7,11 +7,13 @@ import ssl
 import certifi
 import os
 import gspread
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from google.oauth2.service_account import Credentials
 
 TOKEN = os.getenv("TOKEN")
+TAGS_CHAT_ID = 2000000004
+STATS_FILE = "/app/data/messages_stats.json"
 
 ssl._create_default_https_context = lambda: ssl.create_default_context(
     cafile=certifi.where()
@@ -66,6 +68,61 @@ technical_sheet = spreadsheet.worksheet("Технический")
 
 print("БОТ ЗАПУЩЕН")
 
+async def get_message_statistics():
+    now = datetime.now()
+    day_ago = now - timedelta(days=1)
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+
+    count_day = 0
+    count_week = 0
+    count_month = 0
+
+    offset = 0
+    count = 200
+
+    while True:
+        history = await api.messages.get_history(
+            peer_id=TAGS_CHAT_ID,
+            count=count,
+            offset=offset
+        )
+
+        messages = history.items
+
+        if not messages:
+            break
+
+        reached_month = False
+
+        for message in messages:
+            message_time = datetime.fromtimestamp(message.date)
+
+            if message_time >= day_ago:
+                count_day += 1
+
+            if message_time >= week_ago:
+                count_week += 1
+
+            if message_time >= month_ago:
+                count_month += 1
+            else:
+                reached_month = True
+                break
+
+        if reached_month:
+            break
+
+        offset += count
+
+    return count_day, count_week, count_month
+
+@bot.on.message(text="/id")
+async def get_chat_id(message):
+    await message.answer(
+        f"peer_id: {message.peer_id}\n"
+        f"conversation_message_id: {message.conversation_message_id}"
+    )
 
 async def get_ping(message, api):
     reply = message.reply_message
@@ -277,9 +334,7 @@ def days_text(days):
     else:
         return f"{days} дней"
     
-def all_players_answered(tag):
-    values = technical_sheet.get_all_values()
-
+def all_players_answered(tag, values):
     found_players = False
 
     for row in values[1:]:
@@ -293,18 +348,14 @@ def all_players_answered(tag):
         if row_tag != tag:
             continue
 
-        # Тег ещё ни разу не запускался новой записью админа
         if not admin_post:
             continue
 
         found_players = True
 
-        # Этот игрок ещё не ответил
         if not player_post:
             return False
 
-        # Если ответ игрока старее поста админа,
-        # значит это старый ответ
         try:
             admin_time = datetime.strptime(
                 admin_post,
@@ -323,24 +374,35 @@ def all_players_answered(tag):
     return found_players
     
 def get_deadlines(user_tag=None):
-    tags = sheet.col_values(1)[1:]      # A — теги дедлайнов
-    users = sheet.col_values(3)[1:]     # C — теги людей
-    dates = sheet.col_values(4)[1:]     # D — даты
+    # Читаем основной лист один раз
+    values = sheet.get_all_values()
+
+    # Читаем технический лист один раз
+    technical_values = technical_sheet.get_all_values()
 
     today = datetime.now().date()
-
     deadlines = []
 
-    for tag, user, date_text in zip(tags, users, dates):
+    for row in values[1:]:
+        if len(row) < 4:
+            continue
+
+        tag = row[0].strip()
+        user = row[2].strip()
+        date_text = row[3].strip()
+
         if not tag or not date_text:
             continue
 
         # Если указан пользователь — пропускаем чужие строки
         if user_tag and user_tag not in user:
-             continue
+            continue
 
         try:
-            last_date = datetime.strptime(date_text, "%d.%m.%Y").date()
+            last_date = datetime.strptime(
+                date_text,
+                "%d.%m.%Y"
+            ).date()
         except ValueError:
             continue
 
@@ -362,21 +424,94 @@ def get_deadlines(user_tag=None):
             emoji = "⬛"
             text = days_text(days)
 
-        status = " 🟢" if all_players_answered(tag) else ""
+        status = " 🟢" if all_players_answered(tag, technical_values) else ""
 
         deadlines.append(
-            (days, f"{emoji} {tag} — {last_date.strftime('%d.%m.%Y')} ({text}){status}")
+            (
+                days,
+                f"{emoji} {tag} — "
+                f"{last_date.strftime('%d.%m.%Y')} "
+                f"({text}){status}"
+            )
         )
 
     deadlines.sort(reverse=True)
 
     return "\n".join(item[1] for item in deadlines)
 
+def load_message_stats():
+    if not os.path.exists(STATS_FILE):
+        return []
+
+    try:
+        with open(STATS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_message_stats(stats):
+    with open(STATS_FILE, "w", encoding="utf-8") as f:
+        json.dump(stats, f)
+
+
+def record_message(message):
+    if message.peer_id != TAGS_CHAT_ID:
+        return
+
+    stats = load_message_stats()
+
+    # message.date у vkbottle уже является datetime
+    stats.append(message.date.timestamp())
+
+    # Старые записи сразу удаляем, оставляя небольшой запас
+    year_ago = (datetime.now() - timedelta(days=365)).timestamp()
+    stats = [timestamp for timestamp in stats if timestamp >= year_ago]
+
+    save_message_stats(stats)
+
+def get_message_statistics():
+    stats = load_message_stats()
+
+    now = datetime.now().timestamp()
+    day = 24 * 60 * 60
+    week = 7 * day
+    month = 30 * day
+
+    count_day = sum(timestamp >= now - day for timestamp in stats)
+    count_week = sum(timestamp >= now - week for timestamp in stats)
+    count_month = sum(timestamp >= now - month for timestamp in stats)
+
+    return count_day, count_week, count_month
+
 @bot.on.message()
 async def dice(message):
     print(message.from_id)
-
+    record_message(message)
     text = message.text.lower().strip()
+
+    if text == "/сообщения":
+        day, week, month = get_message_statistics()
+
+        await message.answer(
+            f"📊 Сообщения:\n\n"
+            f"За последние 24 часа: {day}\n"
+            f"За последние 7 дней: {week}\n"
+            f"За последние 30 дней: {month}"
+        )
+        return
+
+    if text.startswith("/дедлайн"):
+        args = text.split()
+
+        if len(args) > 1:
+            user_tag = args[1]
+            result = get_deadlines(user_tag)
+        else:
+            result = get_deadlines()
+
+        await message.answer(result)
+        return
 
     admin_ids = get_admin_ids()
 
@@ -487,17 +622,6 @@ async def dice(message):
             "\n".join(results)
         )
         return
-    
-    if text.startswith("/дедлайн"):
-        args = text.split()
-
-        if len(args) > 1:
-            user_tag = args[1]
-            result = get_deadlines(user_tag)
-        else:
-            result = get_deadlines()
-
-        await message.answer(result)
     
     if text.startswith("/смерть"):
 
