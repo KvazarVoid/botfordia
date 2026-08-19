@@ -318,23 +318,33 @@ def sync_technical_tag(tag, players, admin_post_time):
                 value_input_option="USER_ENTERED"
             )
 
-def get_admin_ids():
-    admin_values = sheet.col_values(6)[1:]  # F — админы
+def get_admin_data():
+    values = sheet.get_all_values()
 
     admin_ids = set()
+    admin_tags = {}
 
-    for value in admin_values:
-        value = value.strip()
+    for row in values[1:]:
+        if len(row) < 6:
+            continue
 
-        if not value:
+        tag = row[0].strip()
+        admin = row[5].strip()
+
+        if not admin:
             continue
 
         try:
-            admin_ids.add(int(value))
+            admin_id = int(admin)
         except ValueError:
             continue
 
-    return admin_ids
+        admin_ids.add(admin_id)
+
+        if tag:
+            admin_tags.setdefault(admin_id, []).append(tag)
+
+    return admin_ids, admin_tags
 
 def update_sheet(text, admin_id):
     tags = re.findall(r"#[A-Za-zА-Яа-яЁё0-9_]+", text)
@@ -638,10 +648,20 @@ async def dice(message):
         await message.answer(result)
         return
 
-    admin_ids = get_admin_ids()
+    admin_ids, admin_tags = get_admin_data()
 
     if message.from_id in admin_ids:
-        update_sheet(message.text, message.from_id)
+        own_tags = admin_tags.get(message.from_id, [])
+
+        message_has_own_tag = any(
+            tag.lower() in message.text.lower()
+            for tag in own_tags
+        )
+
+        if message_has_own_tag:
+            update_sheet(message.text, message.from_id)
+        else:
+            await update_player_response(message)
     else:
         await update_player_response(message)
 
@@ -650,6 +670,7 @@ async def dice(message):
         "/пасхалко": "Пасхалко",
         "/фумо": "https://ru.wikipedia.org/wiki/Смысл_жизни",
         "/диа": "ЛУЧШАЯ РОЛЕВАЯ В МИРЕ\nЛУЧШАЯ РОЛЕВАЯ В МИРЕ\nЛУЧШАЯ РОЛЕВАЯ В МИРЕ",
+        "/помощь": "/кх, /дх или /dх — бросок куба, где Х количество граней.\n/сообщения — количество сообщений за выбранный период.\n/дедлайны — дедлайны. Зелёный кружок отмечает ветки со всеми отписанными постами игроков."
 }    
     
     casino_commands = {
