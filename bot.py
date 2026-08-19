@@ -493,9 +493,9 @@ def get_deadlines(user_tag=None):
         deadlines.append(
             (
                 days,
-                f"{emoji} {tag} — "
+                f"{emoji}{status} {tag} — "
                 f"{last_date.strftime('%d.%m.%Y')} "
-                f"({text}){status}"
+                f"({text})"
             )
         )
 
