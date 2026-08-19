@@ -13,7 +13,10 @@ from google.oauth2.service_account import Credentials
 
 TOKEN = os.getenv("TOKEN")
 TAGS_CHAT_ID = 2000000004
-STATS_FILE = "/app/data/messages_stats.json"
+STATS_FILE = "messages_stats.json"
+tracked_tags = set()
+last_tags_update = 0
+TAGS_UPDATE_INTERVAL = 6 * 60 * 60
 
 ssl._create_default_https_context = lambda: ssl.create_default_context(
     cafile=certifi.where()
@@ -67,6 +70,65 @@ sheet = spreadsheet.sheet1
 technical_sheet = spreadsheet.worksheet("Технический")
 
 print("БОТ ЗАПУЩЕН")
+
+def update_tracked_tags():
+    global tracked_tags, last_tags_update
+
+    tags = sheet.col_values(1)[1:]
+
+    tracked_tags = {
+        tag.strip().lower()
+        for tag in tags
+        if tag.strip()
+    }
+
+    last_tags_update = datetime.now().timestamp()
+
+def get_tracked_tags():
+    global last_tags_update
+
+    now = datetime.now().timestamp()
+
+    if not tracked_tags or now - last_tags_update >= TAGS_UPDATE_INTERVAL:
+        update_tracked_tags()
+
+    return tracked_tags
+
+def record_message(message):
+    if message.peer_id != TAGS_CHAT_ID:
+        return
+
+    text = message.text or ""
+    text_lower = text.lower()
+
+    tags = get_tracked_tags()
+
+    found_tags = [
+        tag for tag in tags
+        if tag in text_lower
+    ]
+
+    # Нет отслеживаемого тега — не записываем
+    if not found_tags:
+        return
+
+    stats = load_message_stats()
+
+    stats.append({
+        "time": message.date.timestamp(),
+        "user_id": message.from_id,
+        "tags": found_tags
+    })
+
+    # Храним историю за год
+    year_ago = (datetime.now() - timedelta(days=365)).timestamp()
+
+    stats = [
+        item for item in stats
+        if item["time"] >= year_ago
+    ]
+
+    save_message_stats(stats)
 
 async def get_message_statistics():
     now = datetime.now()
@@ -449,40 +511,60 @@ def load_message_stats():
     except (json.JSONDecodeError, OSError):
         return []
 
+def load_message_stats():
+    if not os.path.exists(STATS_FILE):
+        return []
+
+    try:
+        with open(STATS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
 
 def save_message_stats(stats):
     with open(STATS_FILE, "w", encoding="utf-8") as f:
-        json.dump(stats, f)
+        json.dump(stats, f, ensure_ascii=False)
 
 
 def record_message(message):
     if message.peer_id != TAGS_CHAT_ID:
         return
 
+    text = message.text or ""
+
+    # Получаем существующие теги из таблицы
+    tags = sheet.col_values(1)[1:]
+
+    found_tags = []
+
+    for tag in tags:
+        tag = tag.strip()
+
+        if tag and tag.lower() in text.lower():
+            found_tags.append(tag)
+
+    # Сообщение без отслеживаемого тега не записываем
+    if not found_tags:
+        return
+
     stats = load_message_stats()
 
-    # message.date у vkbottle уже является datetime
-    stats.append(message.date.timestamp())
+    stats.append({
+        "time": message.date.timestamp(),
+        "user_id": message.from_id,
+        "tags": found_tags
+    })
 
-    # Старые записи сразу удаляем, оставляя небольшой запас
+    # Храним историю за год
     year_ago = (datetime.now() - timedelta(days=365)).timestamp()
-    stats = [timestamp for timestamp in stats if timestamp >= year_ago]
+    stats = [
+        item for item in stats
+        if item["time"] >= year_ago
+    ]
 
     save_message_stats(stats)
 
-def get_message_statistics():
-    stats = load_message_stats()
-
-    now = datetime.now().timestamp()
-    day = 24 * 60 * 60
-    week = 7 * day
-    month = 30 * day
-
-    count_day = sum(timestamp >= now - day for timestamp in stats)
-    count_week = sum(timestamp >= now - week for timestamp in stats)
-    count_month = sum(timestamp >= now - month for timestamp in stats)
-
-    return count_day, count_week, count_month
 
 @bot.on.message()
 async def dice(message):
