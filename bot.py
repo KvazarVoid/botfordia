@@ -604,25 +604,25 @@ async def dice(message):
             f"Всего: {total}"
         )
 
-    if author_counts:
-        text_result += "\n\n👤 По авторам:"
+        if author_counts:
+            text_result += "\n\n👤 По авторам:"
 
-        user_ids = [int(user_id) for user_id in author_counts.keys()]
+            user_ids = [int(user_id) for user_id in author_counts.keys()]
 
-        try:
-            users = await api.users.get(user_ids=user_ids)
+            try:
+                users = await api.users.get(user_ids=user_ids)
 
-            names = {
-                str(user.id): f"{user.first_name} {user.last_name}"
-                for user in users
-            }
+                names = {
+                    str(user.id): f"{user.first_name} {user.last_name}"
+                    for user in users
+                }
 
-        except Exception:
-            names = {}
+            except Exception:
+                names = {}
 
-        for user_id, count in author_counts.items():
-            name = names.get(user_id, f"VK {user_id}")
-            text_result += f"\n{name} — {count}"
+            for user_id, count in author_counts.items():
+                name = names.get(user_id, f"VK {user_id}")
+                text_result += f"\n{name} — {count}"
         await message.answer(text_result)
         return
 
