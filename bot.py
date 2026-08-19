@@ -130,54 +130,46 @@ def record_message(message):
 
     save_message_stats(stats)
 
-async def get_message_statistics():
+def get_message_statistics(period):
+    stats = load_message_stats()
+
     now = datetime.now()
-    day_ago = now - timedelta(days=1)
-    week_ago = now - timedelta(days=7)
-    month_ago = now - timedelta(days=30)
+    now_timestamp = now.timestamp()
 
-    count_day = 0
-    count_week = 0
-    count_month = 0
+    periods = {
+        "день": 1,
+        "неделя": 7,
+        "месяц": 30,
+        "год": 365
+    }
 
-    offset = 0
-    count = 200
+    days = periods[period]
+    start = now - timedelta(days=days)
+    start_timestamp = start.timestamp()
 
-    while True:
-        history = await api.messages.get_history(
-            peer_id=TAGS_CHAT_ID,
-            count=count,
-            offset=offset
+    # Оставляем только сообщения за нужный период
+    period_stats = [
+        item for item in stats
+        if item["time"] >= start_timestamp
+    ]
+
+    # Считаем сообщения по авторам
+    author_counts = {}
+
+    for item in period_stats:
+        user_id = str(item["user_id"])
+        author_counts[user_id] = author_counts.get(user_id, 0) + 1
+
+    # Самые активные сверху
+    author_counts = dict(
+        sorted(
+            author_counts.items(),
+            key=lambda item: item[1],
+            reverse=True
         )
+    )
 
-        messages = history.items
-
-        if not messages:
-            break
-
-        reached_month = False
-
-        for message in messages:
-            message_time = datetime.fromtimestamp(message.date)
-
-            if message_time >= day_ago:
-                count_day += 1
-
-            if message_time >= week_ago:
-                count_week += 1
-
-            if message_time >= month_ago:
-                count_month += 1
-            else:
-                reached_month = True
-                break
-
-        if reached_month:
-            break
-
-        offset += count
-
-    return count_day, count_week, count_month
+    return start, now, len(period_stats), author_counts
 
 @bot.on.message(text="/id")
 async def get_chat_id(message):
@@ -572,15 +564,66 @@ async def dice(message):
     record_message(message)
     text = message.text.lower().strip()
 
-    if text == "/сообщения":
-        day, week, month = get_message_statistics()
+    if text == "/обновитьтеги":
+        update_tracked_tags()
 
         await message.answer(
-            f"📊 Сообщения:\n\n"
-            f"За последние 24 часа: {day}\n"
-            f"За последние 7 дней: {week}\n"
-            f"За последние 30 дней: {month}"
+            f"✅ Список тегов обновлён.\n"
+            f"Загружено тегов: {len(tracked_tags)}"
         )
+        return
+
+    if text.startswith("/сообщения"):
+        args = text.split()
+
+        if len(args) != 2 or args[1] not in {"день", "неделя", "месяц", "год"}:
+            await message.answer(
+                "Использование:\n"
+                "/сообщения день\n"
+                "/сообщения неделя\n"
+                "/сообщения месяц\n"
+                "/сообщения год"
+            )
+            return
+
+        period = args[1]
+
+        start, end, total, author_counts = get_message_statistics(period)
+
+        if period == "день":
+            date_text = end.strftime("%d.%m.%Y")
+        else:
+            date_text = (
+                f"{start.strftime('%d.%m.%Y')} — "
+                f"{end.strftime('%d.%m.%Y')}"
+            )
+
+        text_result = (
+            f"📊 Сообщения за {period}\n"
+            f"{date_text}\n\n"
+            f"Всего: {total}"
+        )
+
+    if author_counts:
+        text_result += "\n\n👤 По авторам:"
+
+        user_ids = [int(user_id) for user_id in author_counts.keys()]
+
+        try:
+            users = await api.users.get(user_ids=user_ids)
+
+            names = {
+                str(user.id): f"{user.first_name} {user.last_name}"
+                for user in users
+            }
+
+        except Exception:
+            names = {}
+
+        for user_id, count in author_counts.items():
+            name = names.get(user_id, f"VK {user_id}")
+            text_result += f"\n{name} — {count}"
+        await message.answer(text_result)
         return
 
     if text.startswith("/дедлайн"):
@@ -776,4 +819,5 @@ async def dice(message):
         f"[ {rolls_text}{mod_text} ]\n"
         f"Σ = {total}"
 )
+update_tracked_tags()
 bot.run()
