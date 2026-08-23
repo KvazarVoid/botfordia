@@ -315,9 +315,11 @@ def create_quote_image(
         text_width
     )
 
+    MIN_HEIGHT = 500
+
     text_height = len(text_lines) * LINE_HEIGHT
 
-    height = (
+    height = max(
         MIN_HEIGHT,
         PADDING
         + AVATAR_SIZE
@@ -335,6 +337,9 @@ def create_quote_image(
             BACKGROUND_PATH
         ).convert("RGB")
 
+        print("WIDTH:", WIDTH, type(WIDTH))
+        print("HEIGHT:", height, type(height))
+        
         background = ImageOps.fit(
             background,
             (WIDTH, height),
