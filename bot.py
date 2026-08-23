@@ -232,7 +232,7 @@ def create_quote_image(
     FONT_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "fonts",
-    "NotoSans-Regular.ttf"
+    "NotoSans_Condensed-Regular.ttf"
     )
 
     # ============================================================
