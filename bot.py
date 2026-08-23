@@ -1,3 +1,4 @@
+import vkbottle
 from vkbottle.bot import Bot
 from vkbottle import API
 from collections import defaultdict
@@ -17,7 +18,6 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import json
 from google.oauth2.service_account import Credentials
-import vkbottle
 
 print("VKBOTTLE VERSION:", vkbottle.__version__)
 
