@@ -193,7 +193,7 @@ def create_quote_image(
 
     # --- Размер карточки ---
     WIDTH = 1200
-    PADDING = 60
+    PADDING = 30
 
     # --- Фон ---
     # Путь к картинке-фону в Railway Volume
@@ -208,20 +208,20 @@ def create_quote_image(
 
     # --- Аватар ---
     AVATAR_SIZE = 140
-    AVATAR_TO_NAME_GAP = 30
+    AVATAR_TO_NAME_GAP = 20
 
     # --- Размеры шрифтов ---
     NAME_SIZE = 42
     DATE_SIZE = 28
-    TEXT_SIZE = 38
+    TEXT_SIZE = 52
 
     # --- Вертикальные расстояния ---
     NAME_TOP_OFFSET = 20
     DATE_GAP = 55
-    TEXT_TOP_GAP = 50
+    TEXT_TOP_GAP = 40
 
     # --- Текст цитаты ---
-    LINE_HEIGHT = 50
+    LINE_HEIGHT = 65
 
     # --- Цвета ---
     NAME_COLOR = "white"
@@ -459,6 +459,18 @@ def create_quote_image(
     )
 
     for line in text_lines:
+        bbox = draw.textbbox(
+            (0, 0),
+            line,
+            font=text_font
+        )
+
+        line_width = bbox[2] - bbox[0]
+
+        text_x = (
+            WIDTH - line_width
+        ) / 2
+
         draw.text(
             (text_x, text_y),
             line,
@@ -468,20 +480,20 @@ def create_quote_image(
 
         text_y += LINE_HEIGHT
 
-    # ============================================================
-    # СОХРАНЕНИЕ В ПАМЯТЬ
-    # ============================================================
+        # ============================================================
+        # СОХРАНЕНИЕ В ПАМЯТЬ
+        # ============================================================
 
-    output = BytesIO()
+        output = BytesIO()
 
-    image.save(
-        output,
-        format="PNG"
-    )
+        image.save(
+            output,
+            format="PNG"
+        )
 
-    output.seek(0)
+        output.seek(0)
 
-    return output
+        return output
 
 @bot.on.message(text="/id")
 async def get_chat_id(message):
