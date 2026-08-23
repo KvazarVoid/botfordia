@@ -228,7 +228,7 @@ def create_quote_image(
     # --- Вертикальные расстояния ---
     NAME_TOP_OFFSET = 20
     DATE_GAP = 55
-    TEXT_TOP_GAP = 20
+    TEXT_TOP_GAP = 0
 
     # --- Текст цитаты ---
     LINE_HEIGHT = 65
@@ -842,9 +842,9 @@ def get_deadlines(user_tag=None):
         deadlines.append(
             (
                 days,
-                f"{emoji} {tag} — "
+                f"{emoji}{status} {tag} — "
                 f"{last_date.strftime('%d.%m.%Y')} "
-                f"({text}){status}"
+                f"({text})"
             )
         )
 
