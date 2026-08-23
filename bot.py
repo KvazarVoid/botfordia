@@ -17,6 +17,9 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import json
 from google.oauth2.service_account import Credentials
+import vkbottle
+
+print("VKBOTTLE VERSION:", vkbottle.__version__)
 
 TOKEN = os.getenv("TOKEN")
 TAGS_CHAT_ID = 2000000004
@@ -1031,6 +1034,7 @@ async def dice(message):
         )
 
         image.name = "quote.png"
+        print("IMAGE TYPE:", type(image))
 
         photo = await photo_uploader.upload(
             file_source=image,
