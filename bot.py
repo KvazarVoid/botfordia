@@ -206,6 +206,7 @@ def create_quote_image(
     # 0 = не затемнять
     # 255 = полностью чёрный
     BACKGROUND_DARKNESS = 126
+    MIN_HEIGHT = 500
 
     # --- Аватар ---
     AVATAR_SIZE = 140
@@ -317,6 +318,7 @@ def create_quote_image(
     text_height = len(text_lines) * LINE_HEIGHT
 
     height = (
+        MIN_HEIGHT,
         PADDING
         + AVATAR_SIZE
         + TEXT_TOP_GAP
