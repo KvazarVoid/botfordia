@@ -966,13 +966,15 @@ async def upload_quote_photo(api, image, peer_id):
             f"VK не вернул photo: {upload_result}"
         )
 
-    saved_photo = await api.photos.save_messages_photo(
+    saved_photos = await api.photos.save_messages_photo(
         server=upload_result["server"],
         photo=upload_result["photo"],
         hash=upload_result["hash"]
         )
 
-    print("SAVED PHOTO:", saved_photo)
+    print("SAVED PHOTO:", saved_photos)
+
+    saved_photo = saved_photos[0]
 
     return f"photo{saved_photo.owner_id}_{saved_photo.id}"
 
