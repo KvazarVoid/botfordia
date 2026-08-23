@@ -924,35 +924,47 @@ def record_message(message):
 
     save_message_stats(stats)
 
-async def upload_quote_photo(api, image, peer_id):
-    server_data = await api.photos.get_messages_upload_server(
-        peer_id=peer_id
-    )
-
-    upload_url = server_data.upload_url
-
-    print("UPLOAD URL:", upload_url)
-
+async def upload_quote_photo(api, image, peer_id, max_attempts=3):
+    # Сохраняем готовую картинку в байты,
+    # чтобы использовать её повторно
     image.seek(0)
+    image_bytes = image.read()
 
-    form = aiohttp.FormData()
-    form.add_field(
-        "photo",
-        image,
-        filename="quote.png",
-        content_type="image/png"
-    )
+    for attempt in range(1, max_attempts + 1):
+        print(f"QUOTE UPLOAD: попытка {attempt}/{max_attempts}")
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            upload_url,
-            data=form
-        ) as response:
+        try:
+            # Получаем новый upload URL для каждой попытки
+            server_data = await api.photos.get_messages_upload_server(
+                peer_id=peer_id
+            )
 
-            raw = await response.text()
+            upload_url = server_data.upload_url
 
-            print("UPLOAD HTTP:", response.status)
-            print("UPLOAD RESPONSE:", raw)
+            print("UPLOAD URL:", upload_url)
+
+            # Создаём новый файл для каждой попытки
+            upload_file = BytesIO(image_bytes)
+            upload_file.name = "quote.png"
+
+            form = aiohttp.FormData()
+            form.add_field(
+                "photo",
+                upload_file,
+                filename="quote.png",
+                content_type="image/png"
+            )
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    upload_url,
+                    data=form
+                ) as response:
+
+                    raw = await response.text()
+
+                    print("UPLOAD HTTP:", response.status)
+                    print("UPLOAD RESPONSE:", raw)
 
             if response.status != 200:
                 raise RuntimeError(
@@ -961,23 +973,43 @@ async def upload_quote_photo(api, image, peer_id):
 
             upload_result = json.loads(raw)
 
-    if not upload_result.get("photo"):
-        raise RuntimeError(
-            f"VK не вернул photo: {upload_result}"
-        )
+            # VK иногда возвращает 200, но пустой photo
+            if not upload_result.get("photo"):
+                print(
+                    f"VK не вернул photo "
+                    f"(попытка {attempt}/{max_attempts})"
+                )
 
-    saved_photos = await api.photos.save_messages_photo(
-        server=upload_result["server"],
-        photo=upload_result["photo"],
-        hash=upload_result["hash"]
-        )
+                if attempt < max_attempts:
+                    continue
 
-    print("SAVED PHOTO:", saved_photos)
+                raise RuntimeError(
+                    f"VK не вернул photo после "
+                    f"{max_attempts} попыток"
+                )
 
-    saved_photo = saved_photos[0]
+            # Сохраняем фотографию в VK
+            saved_photos = await api.photos.save_messages_photo(
+                server=upload_result["server"],
+                photo=upload_result["photo"],
+                hash=upload_result["hash"]
+            )
 
-    return f"photo{saved_photo.owner_id}_{saved_photo.id}"
+            print("SAVED PHOTO:", saved_photos)
 
+            saved_photo = saved_photos[0]
+
+            return f"photo{saved_photo.owner_id}_{saved_photo.id}"
+
+        except Exception as e:
+            print(
+                f"Ошибка загрузки цитаты "
+                f"(попытка {attempt}/{max_attempts}): {e}"
+            )
+
+            if attempt >= max_attempts:
+                raise
+            
 @bot.on.message()
 async def dice(message):
     print(message.from_id)
