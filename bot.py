@@ -228,7 +228,7 @@ def create_quote_image(
     # --- Вертикальные расстояния ---
     NAME_TOP_OFFSET = 20
     DATE_GAP = 55
-    TEXT_TOP_GAP = 0
+    TEXT_TOP_GAP = -10
 
     # --- Текст цитаты ---
     LINE_HEIGHT = 65
