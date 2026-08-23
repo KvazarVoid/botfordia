@@ -1,4 +1,3 @@
-import vkbottle
 from vkbottle.bot import Bot
 from vkbottle import API
 from collections import defaultdict
@@ -18,6 +17,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import json
 from google.oauth2.service_account import Credentials
+import vkbottle
 
 TOKEN = os.getenv("TOKEN")
 TAGS_CHAT_ID = 2000000004
@@ -1001,6 +1001,7 @@ async def dice(message):
 
         # Данные сообщения
         quote_text = reply.text or ""
+        print("QUOTE TEXT:", repr(quote_text))
         user_id = reply.from_id
         quote_date = reply.date.replace(tzinfo=ZoneInfo("UTC")).astimezone(
             ZoneInfo("Europe/Kyiv")
