@@ -449,16 +449,30 @@ def create_quote_image(
     # ============================================================
     # ТЕКСТ ЦИТАТЫ
     # ============================================================
-
-    text_x = PADDING
-
-    text_y = (
+    # Высота области, в которой размещаем цитату
+    text_area_top = (
         PADDING
         + AVATAR_SIZE
         + TEXT_TOP_GAP
     )
 
+    text_area_bottom = height - PADDING
+
+    text_area_height = (
+        text_area_bottom - text_area_top
+    )
+
+    # Общая высота всех строк
+    total_text_height = len(text_lines) * LINE_HEIGHT
+
+    # Центрируем цитату по вертикали
+    text_y = (
+        text_area_top
+        + (text_area_height - total_text_height) / 2
+    )
+
     for line in text_lines:
+        # Центрируем каждую строку по горизонтали
         bbox = draw.textbbox(
             (0, 0),
             line,
@@ -1016,9 +1030,15 @@ async def dice(message):
             quote_text=quote_text
         )
 
+        image.name = "quote.png"
+
         photo = await photo_uploader.upload(
-            file_source=image.getvalue(),
+            file_source=image,
             peer_id=message.peer_id
+        )
+
+        await message.answer(
+            attachment=photo
         )
 
         await message.answer(
