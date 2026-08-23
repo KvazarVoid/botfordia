@@ -196,8 +196,6 @@ def create_quote_image(
     test_image.save(image, format="PNG")
     image.seek(0)
     image.name = "quote.png"
-    print("AVATAR:", repr(avatar_url))
-    print("SIZE:", len(image.getvalue()))
     # ============================================================
     # НАСТРОЙКИ ВНЕШНЕГО ВИДА
     # ============================================================
@@ -250,9 +248,6 @@ def create_quote_image(
     # ============================================================
     # ГЕНЕРАЦИЯ ШРИФТОВ
     # ============================================================
-
-    print("FONT_PATH:", FONT_PATH)
-    print("FONT EXISTS:", os.path.exists(FONT_PATH))
 
     name_font = ImageFont.truetype(
         FONT_PATH,
@@ -346,9 +341,6 @@ def create_quote_image(
         background = Image.open(
             BACKGROUND_PATH
         ).convert("RGB")
-
-        print("WIDTH:", WIDTH, type(WIDTH))
-        print("HEIGHT:", height, type(height))
 
         background = ImageOps.fit(
             background,
@@ -963,9 +955,6 @@ async def upload_quote_photo(api, image, peer_id, max_attempts=3):
 
                     raw = await response.text()
 
-                    print("UPLOAD HTTP:", response.status)
-                    print("UPLOAD RESPONSE:", raw)
-
             if response.status != 200:
                 raise RuntimeError(
                     f"VK upload error {response.status}: {raw}"
@@ -1095,8 +1084,6 @@ async def dice(message):
         return
     if text == "/цитата":
         reply = message.reply_message
-        print("CALLER:", message.from_id)
-        print("QUOTE AUTHOR:", reply.from_id)
 
         if not reply:
             await message.answer(
@@ -1106,7 +1093,6 @@ async def dice(message):
 
         # Данные сообщения
         quote_text = reply.text or ""
-        print("QUOTE TEXT:", repr(quote_text))
         user_id = reply.from_id
         quote_date = reply.date.replace(tzinfo=ZoneInfo("UTC")).astimezone(
             ZoneInfo("Europe/Kyiv")
@@ -1138,13 +1124,6 @@ async def dice(message):
         )
 
         image.name = "quote.png"
-        print("IMAGE TYPE:", type(image))
-        print("=== QUOTE UPLOAD ===")
-        print("PEER:", message.peer_id)
-        print("IMAGE:", type(image))
-        print("IMAGE NAME:", getattr(image, "name", None))
-        print("IMAGE POS:", image.tell())
-        print("IMAGE SIZE:", len(image.getvalue()))
 
         photo = await upload_quote_photo(
         api=api,
@@ -1156,8 +1135,6 @@ async def dice(message):
             attachment=photo
         )
 
-        print(f"Автор: {user_name}")
-        print(f"VK ID: {user_id}")
 
         return
 
@@ -1334,9 +1311,6 @@ async def dice(message):
             "\n".join(output)
         )
 
-        return
-    if text == "/тестответ":
-        print("АЙЛА:", all_players_answered("#Айла"))
         return
     
     if text == "/расклад":
