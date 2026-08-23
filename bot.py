@@ -299,7 +299,7 @@ def create_quote_image(
 
             if current_line:
                 lines.append(current_line)
-
+        print("TEXT LINES:", repr(text_lines))
         return lines
 
     # ============================================================
