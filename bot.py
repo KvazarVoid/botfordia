@@ -220,7 +220,7 @@ def create_quote_image(
     # --- Вертикальные расстояния ---
     NAME_TOP_OFFSET = 20
     DATE_GAP = 55
-    TEXT_TOP_GAP = 30
+    TEXT_TOP_GAP = 20
 
     # --- Текст цитаты ---
     LINE_HEIGHT = 65
@@ -1000,6 +1000,8 @@ async def dice(message):
         return
     if text == "/цитата":
         reply = message.reply_message
+        print("CALLER:", message.from_id)
+        print("QUOTE AUTHOR:", reply.from_id)
 
         if not reply:
             await message.answer(
