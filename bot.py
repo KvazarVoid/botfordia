@@ -299,7 +299,6 @@ def create_quote_image(
 
             if current_line:
                 lines.append(current_line)
-        print("TEXT LINES:", repr(text_lines))
         return lines
 
     # ============================================================
@@ -314,6 +313,7 @@ def create_quote_image(
         text_font,
         text_width
     )
+    print("TEXT LINES:", repr(text_lines))
 
     text_height = len(text_lines) * LINE_HEIGHT
 
