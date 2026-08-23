@@ -204,7 +204,7 @@ def create_quote_image(
     # Насколько затемнять фон
     # 0 = не затемнять
     # 255 = полностью чёрный
-    BACKGROUND_DARKNESS = 70
+    BACKGROUND_DARKNESS = 126
 
     # --- Аватар ---
     AVATAR_SIZE = 140
@@ -224,9 +224,9 @@ def create_quote_image(
     LINE_HEIGHT = 50
 
     # --- Цвета ---
-    NAME_COLOR = "black"
-    DATE_COLOR = "#777777"
-    TEXT_COLOR = "black"
+    NAME_COLOR = "white"
+    DATE_COLOR = "white"
+    TEXT_COLOR = "white"
 
     # --- Шрифт ---
     FONT_PATH = os.path.join(
