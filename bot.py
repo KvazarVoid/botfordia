@@ -225,7 +225,7 @@ def create_quote_image(
 
     # --- Цвета ---
     NAME_COLOR = "white"
-    DATE_COLOR = "white"
+    DATE_COLOR = "#FFFFFF"
     TEXT_COLOR = "white"
 
     # --- Шрифт ---
