@@ -237,6 +237,9 @@ def create_quote_image(
     # ГЕНЕРАЦИЯ ШРИФТОВ
     # ============================================================
 
+    print("FONT_PATH:", FONT_PATH)
+    print("FONT EXISTS:", os.path.exists(FONT_PATH))
+    
     name_font = ImageFont.truetype(
         FONT_PATH,
         NAME_SIZE
