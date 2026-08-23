@@ -188,6 +188,16 @@ def create_quote_image(
     quote_date,
     quote_text,
 ):
+    from io import BytesIO
+    from PIL import Image
+
+    test_image = Image.new("RGB", (1200, 500), "white")
+    image = BytesIO()
+    test_image.save(image, format="PNG")
+    image.seek(0)
+    image.name = "quote.png"
+    print("AVATAR:", repr(avatar_url))
+    print("SIZE:", len(image.getvalue()))
     # ============================================================
     # НАСТРОЙКИ ВНЕШНЕГО ВИДА
     # ============================================================
