@@ -1042,6 +1042,12 @@ async def dice(message):
 
         image.name = "quote.png"
         print("IMAGE TYPE:", type(image))
+        print("=== QUOTE UPLOAD ===")
+        print("PEER:", message.peer_id)
+        print("IMAGE:", type(image))
+        print("IMAGE NAME:", getattr(image, "name", None))
+        print("IMAGE POS:", image.tell())
+        print("IMAGE SIZE:", len(image.getvalue()))
 
         photo = await photo_uploader.upload(
             file_source=image,
