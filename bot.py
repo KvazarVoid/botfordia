@@ -229,7 +229,11 @@ def create_quote_image(
     TEXT_COLOR = "black"         # Цвет основного текста
 
     # --- Шрифт ---
-    FONT_PATH = r"C:\Windows\Fonts\arial.ttf"
+    FONT_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "fonts",
+    "NotoSans-Regular.ttf"
+    )
 
     # ============================================================
     # ГЕНЕРАЦИЯ КАРТИНКИ
