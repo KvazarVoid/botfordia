@@ -6,8 +6,14 @@ import re
 import ssl
 import certifi
 import os
+import aiohttp
 import gspread
+from pilmoji import Pilmoji
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+from io import BytesIO
+from urllib.request import urlopen
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 import json
 from google.oauth2.service_account import Credentials
 
@@ -17,6 +23,8 @@ STATS_FILE = "/app/data/messages_stats.json"
 tracked_tags = set()
 last_tags_update = 0
 TAGS_UPDATE_INTERVAL = 6 * 60 * 60
+BACKGROUND_PATH = "/app/data/quote_background.jpg"
+waiting_for_background = set()
 
 ssl._create_default_https_context = lambda: ssl.create_default_context(
     cafile=certifi.where()
@@ -138,7 +146,7 @@ def get_message_statistics(period):
 
     periods = {
         "день": 1,
-        "неделя": 7,
+        "неделю": 7,
         "месяц": 30,
         "год": 365
     }
@@ -170,6 +178,288 @@ def get_message_statistics(period):
     )
 
     return start, now, len(period_stats), author_counts
+#Обработчик цитат
+def create_quote_image(
+    avatar_url,
+    user_name,
+    quote_date,
+    quote_text,
+):
+    # ============================================================
+    # НАСТРОЙКИ ВНЕШНЕГО ВИДА
+    # ============================================================
+
+    # --- Размер карточки ---
+    WIDTH = 1200                 # Общая ширина изображения
+    PADDING = 60                 # Отступ содержимого от краёв
+
+    # None = обычный однотонный фон.
+    # Путь к картинке-фону в Railway Volume
+    BACKGROUND_PATH = "/app/data/quote_background.jpg"
+
+    BACKGROUND_COLOR = "#f2f2f2"
+
+    # Насколько затемнять фон.
+    # 0 = не затемнять
+    # 255 = полностью чёрный
+    BACKGROUND_DARKNESS = 70
+
+    # --- Аватар ---
+    AVATAR_SIZE = 140            # Размер аватарки в пикселях
+    AVATAR_TO_NAME_GAP = 30      # Расстояние между аватаркой и именем
+
+    # --- Размеры шрифтов ---
+    NAME_SIZE = 42               # Размер имени автора
+    DATE_SIZE = 28               # Размер даты
+    TEXT_SIZE = 38               # Размер текста цитаты
+
+    # --- Вертикальные расстояния ---
+    NAME_TOP_OFFSET = 20         # Насколько ниже верхнего края находится имя
+    DATE_GAP = 55                # Расстояние от имени до даты
+    TEXT_TOP_GAP = 50            # Расстояние от аватарки до текста
+
+    # --- Текст цитаты ---
+    LINE_HEIGHT = 50             # Расстояние между строками цитаты
+
+    # --- Цвета ---
+    BACKGROUND_COLOR = "white"   # Цвет фона карточки
+
+    NAME_COLOR = "black"         # Цвет имени
+    DATE_COLOR = "#777777"       # Цвет даты
+    TEXT_COLOR = "black"         # Цвет основного текста
+
+    # --- Шрифт ---
+    FONT_PATH = r"C:\Windows\Fonts\arial.ttf"
+
+    # ============================================================
+    # ГЕНЕРАЦИЯ КАРТИНКИ
+    # ============================================================
+
+    name_font = ImageFont.truetype(
+        FONT_PATH,
+        NAME_SIZE
+    )
+
+    date_font = ImageFont.truetype(
+        FONT_PATH,
+        DATE_SIZE
+    )
+
+    text_font = ImageFont.truetype(
+        FONT_PATH,
+        TEXT_SIZE
+    )
+
+    text_width = WIDTH - PADDING * 2
+
+def wrap_text(text, font, max_width):
+    lines = []
+
+    # Обрабатываем каждую строку отдельно,
+    # чтобы сохранять переносы строк из сообщения
+    for paragraph in text.splitlines():
+
+        # Пустая строка = настоящий абзац
+        if not paragraph.strip():
+            lines.append("")
+            continue
+
+        words = paragraph.split()
+        current_line = ""
+
+        for word in words:
+            test_line = (
+                word
+                if not current_line
+                else current_line + " " + word
+            )
+
+            bbox = font.getbbox(test_line)
+            line_width = bbox[2] - bbox[0]
+
+            if line_width <= max_width:
+                current_line = test_line
+            else:
+                if current_line:
+                    lines.append(current_line)
+
+                current_line = word
+
+        if current_line:
+            lines.append(current_line)
+
+    return lines
+
+    if not quote_text.strip():
+        quote_text = "[сообщение без текста]"
+
+    text_lines = wrap_text(
+        quote_text,
+        text_font,
+        text_width
+    )
+
+    text_height = len(text_lines) * LINE_HEIGHT
+
+    height = (
+        PADDING
+        + AVATAR_SIZE
+        + TEXT_TOP_GAP
+        + text_height
+        + PADDING
+    )
+
+    if BACKGROUND_PATH:
+        background = Image.open(
+            BACKGROUND_PATH
+        ).convert("RGB")
+
+        background = ImageOps.fit(
+            background,
+            (WIDTH, height),
+            method=Image.Resampling.LANCZOS
+        )
+
+        image = background
+
+        # Затемнение фона, чтобы текст оставался читаемым
+        overlay = Image.new(
+            "RGB",
+            (WIDTH, height),
+            "black"
+        )
+
+        image = Image.blend(
+            image,
+            overlay,
+            BACKGROUND_DARKNESS / 255
+        )
+
+    else:
+        image = Image.new(
+            "RGB",
+            (WIDTH, height),
+            BACKGROUND_COLOR
+        )
+    draw = ImageDraw.Draw(image)
+
+    # ============================================================
+    # АВАТАР
+    # ============================================================
+
+    try:
+        avatar_data = urlopen(
+            avatar_url,
+            timeout=10
+        ).read()
+
+        avatar = Image.open(
+            BytesIO(avatar_data)
+        ).convert("RGB")
+
+        avatar = avatar.resize(
+            (AVATAR_SIZE, AVATAR_SIZE),
+            Image.Resampling.LANCZOS
+        )
+
+        mask = Image.new(
+            "L",
+            (AVATAR_SIZE, AVATAR_SIZE),
+            0
+        )
+
+        mask_draw = ImageDraw.Draw(mask)
+
+        mask_draw.ellipse(
+            (0, 0, AVATAR_SIZE, AVATAR_SIZE),
+            fill=255
+        )
+
+        image.paste(
+            avatar,
+            (PADDING, PADDING),
+            mask
+        )
+
+    except Exception as e:
+        print(f"Ошибка загрузки аватарки: {e}")
+
+    # ============================================================
+    # ИМЯ
+    # ============================================================
+
+    name_x = (
+        PADDING
+        + AVATAR_SIZE
+        + AVATAR_TO_NAME_GAP
+    )
+
+    name_y = (
+        PADDING
+        + NAME_TOP_OFFSET
+    )
+
+    with Pilmoji(image) as pilmoji:
+        pilmoji.text(
+            (name_x, name_y),
+            user_name,
+            fill=NAME_COLOR,
+            font=name_font
+        )
+    # ============================================================
+    # ДАТА
+    # ============================================================
+
+    date_x = name_x
+
+    date_y = (
+        name_y
+        + DATE_GAP
+    )
+
+    with Pilmoji(image) as pilmoji:
+        pilmoji.text(
+            (date_x, date_y),
+            quote_date.strftime("%d.%m.%Y %H:%M"),
+            fill=DATE_COLOR,
+            font=date_font
+        )
+    # ============================================================
+    # ТЕКСТ ЦИТАТЫ
+    # ============================================================
+
+    text_x = PADDING
+
+    text_y = (
+        PADDING
+        + AVATAR_SIZE
+        + TEXT_TOP_GAP
+    )
+
+    for line in text_lines:
+        draw.text(
+            (text_x, text_y),
+            line,
+            font=text_font,
+            fill=TEXT_COLOR
+        )
+
+        text_y += LINE_HEIGHT
+
+    # ============================================================
+    # СОХРАНЕНИЕ В ПАМЯТЬ
+    # ============================================================
+
+    output = BytesIO()
+
+    image.save(
+        output,
+        format="PNG"
+    )
+
+    output.seek(0)
+
+    return output
 
 @bot.on.message(text="/id")
 async def get_chat_id(message):
@@ -493,9 +783,9 @@ def get_deadlines(user_tag=None):
         deadlines.append(
             (
                 days,
-                f"{emoji}{status} {tag} — "
+                f"{emoji} {tag} — "
                 f"{last_date.strftime('%d.%m.%Y')} "
-                f"({text})"
+                f"({text}){status}"
             )
         )
 
@@ -572,7 +862,146 @@ def record_message(message):
 async def dice(message):
     print(message.from_id)
     record_message(message)
-    text = message.text.lower().strip()
+
+    text = (message.text or "").lower().strip()
+
+    # ============================================================
+    # СМЕНА ФОНА ЦИТАТ
+    # ============================================================
+
+    if text == "/фон":
+
+        admin_ids, _ = get_admin_data()
+
+        # Только для админов
+        if message.from_id not in admin_ids:
+            await message.answer(
+                "❌ У тебя нет прав для смены фона."
+            )
+            return
+
+        # Команда должна быть ответом на сообщение
+        reply = message.reply_message
+
+        if not reply:
+            await message.answer(
+                "🖼 Ответь командой /фон на сообщение с картинкой."
+            )
+            return
+
+        # Ищем фотографию среди вложений
+        photo = None
+
+        for attachment in reply.attachments:
+            if attachment.type == "photo":
+                photo = attachment.photo
+                break
+
+        if photo is None:
+            await message.answer(
+                "❌ В сообщении, на которое ты ответил, нет фотографии."
+            )
+            return
+
+        try:
+            # Берём самое большое доступное изображение
+            largest_size = max(
+                photo.sizes,
+                key=lambda size: size.width * size.height
+            )
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    largest_size.url
+                ) as response:
+
+                    if response.status != 200:
+                        raise Exception(
+                            f"VK вернул HTTP {response.status}"
+                        )
+
+                    image_data = await response.read()
+
+            with open(BACKGROUND_PATH, "wb") as file:
+                file.write(image_data)
+
+            await message.answer(
+                "✅ Фон цитат успешно изменён."
+            )
+
+            print(
+                f"Новый фон сохранён в {BACKGROUND_PATH}"
+            )
+
+        except Exception as e:
+            print(f"Ошибка сохранения фона: {e}")
+
+            await message.answer(
+                "❌ Не удалось сохранить изображение."
+            )
+
+        return
+    if text == "/цитата":
+        reply = message.reply_message
+
+        if not reply:
+            await message.answer(
+                "❌ Команду /цитата нужно использовать ответом на сообщение."
+            )
+            return
+
+        # Данные сообщения
+        quote_text = reply.text or ""
+        user_id = reply.from_id
+        quote_date = reply.date.replace(tzinfo=ZoneInfo("UTC")).astimezone(
+            ZoneInfo("Europe/Kyiv")
+        )
+        # Получаем имя пользователя
+        try:
+            users = await api.users.get(
+    user_ids=[user_id],
+    fields=["photo_200"]
+)
+
+            if users:
+                user = users[0]
+                user_name = f"{user.first_name} {user.last_name}"
+                avatar_url = user.photo_200
+            else:
+                user_name = f"VK ID {user_id}"
+                avatar_url = None
+
+        except Exception as e:
+            print(f"Ошибка получения пользователя: {e}")
+            user_name = f"VK ID {user_id}"
+
+        image = create_quote_image(
+        avatar_url=avatar_url,
+        user_name=user_name,
+        quote_date=quote_date,
+        quote_text=quote_text,
+        )
+
+        with open("test_quote.png", "wb") as f:
+            f.write(image.getvalue())
+        await message.answer("✅ Картинка создана: test_quote.png")
+
+        print("=== ЦИТАТА ===")
+        print(f"Автор: {user_name}")
+        print(f"VK ID: {user_id}")
+        print(f"Дата: {quote_date.strftime('%d.%m.%Y %H:%M:%S')}")
+        print(f"Аватар: {avatar_url}")
+        print(f"Текст: {quote_text}")
+        print("==============")
+
+        await message.answer(
+            f"Автор: {user_name}\n"
+            f"VK ID: {user_id}\n"
+            f"Дата: {quote_date.strftime('%d.%m.%Y %H:%M:%S')}\n\n"
+            f"Текст:\n{quote_text}"
+        )
+
+        return
 
     if text == "/обновитьтеги":
         update_tracked_tags()
