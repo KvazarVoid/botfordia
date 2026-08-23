@@ -220,7 +220,7 @@ def create_quote_image(
     # --- Вертикальные расстояния ---
     NAME_TOP_OFFSET = 20
     DATE_GAP = 55
-    TEXT_TOP_GAP = 40
+    TEXT_TOP_GAP = 30
 
     # --- Текст цитаты ---
     LINE_HEIGHT = 65
@@ -339,7 +339,7 @@ def create_quote_image(
 
         print("WIDTH:", WIDTH, type(WIDTH))
         print("HEIGHT:", height, type(height))
-        
+
         background = ImageOps.fit(
             background,
             (WIDTH, height),
