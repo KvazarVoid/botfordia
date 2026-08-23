@@ -924,6 +924,48 @@ def record_message(message):
 
     save_message_stats(stats)
 
+async def upload_quote_photo(api, image, peer_id):
+    server_data = await api.photos.get_messages_upload_server(
+        peer_id=peer_id
+    )
+
+    upload_url = server_data.upload_url
+
+    print("UPLOAD URL:", upload_url)
+
+    image.seek(0)
+
+    form = aiohttp.FormData()
+    form.add_field(
+        "photo",
+        image,
+        filename="quote.png",
+        content_type="image/png"
+    )
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            upload_url,
+            data=form
+        ) as response:
+
+            raw = await response.text()
+
+            print("UPLOAD HTTP:", response.status)
+            print("UPLOAD RESPONSE:", raw)
+
+            if response.status != 200:
+                raise RuntimeError(
+                    f"VK upload error {response.status}: {raw}"
+                )
+
+            upload_result = json.loads(raw)
+
+    return await api.photos.save_messages_photo(
+        server=upload_result["server"],
+        photo=upload_result["photo"],
+        hash=upload_result["hash"]
+    )
 
 @bot.on.message()
 async def dice(message):
@@ -1061,9 +1103,10 @@ async def dice(message):
         print("IMAGE POS:", image.tell())
         print("IMAGE SIZE:", len(image.getvalue()))
 
-        photo = await photo_uploader.upload(
-            file_source=image,
-            peer_id=message.peer_id
+        photo = await upload_quote_photo(
+        api=api,
+        image=image,
+        peer_id=message.peer_id
         )
 
         await message.answer(
