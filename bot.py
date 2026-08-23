@@ -190,53 +190,51 @@ def create_quote_image(
     # ============================================================
 
     # --- Размер карточки ---
-    WIDTH = 1200                 # Общая ширина изображения
-    PADDING = 60                 # Отступ содержимого от краёв
+    WIDTH = 1200
+    PADDING = 60
 
-    # None = обычный однотонный фон.
+    # --- Фон ---
     # Путь к картинке-фону в Railway Volume
     BACKGROUND_PATH = "/app/data/quote_background.jpg"
 
-    BACKGROUND_COLOR = "#f2f2f2"
+    BACKGROUND_COLOR = "white"
 
-    # Насколько затемнять фон.
+    # Насколько затемнять фон
     # 0 = не затемнять
     # 255 = полностью чёрный
     BACKGROUND_DARKNESS = 70
 
     # --- Аватар ---
-    AVATAR_SIZE = 140            # Размер аватарки в пикселях
-    AVATAR_TO_NAME_GAP = 30      # Расстояние между аватаркой и именем
+    AVATAR_SIZE = 140
+    AVATAR_TO_NAME_GAP = 30
 
     # --- Размеры шрифтов ---
-    NAME_SIZE = 42               # Размер имени автора
-    DATE_SIZE = 28               # Размер даты
-    TEXT_SIZE = 38               # Размер текста цитаты
+    NAME_SIZE = 42
+    DATE_SIZE = 28
+    TEXT_SIZE = 38
 
     # --- Вертикальные расстояния ---
-    NAME_TOP_OFFSET = 20         # Насколько ниже верхнего края находится имя
-    DATE_GAP = 55                # Расстояние от имени до даты
-    TEXT_TOP_GAP = 50            # Расстояние от аватарки до текста
+    NAME_TOP_OFFSET = 20
+    DATE_GAP = 55
+    TEXT_TOP_GAP = 50
 
     # --- Текст цитаты ---
-    LINE_HEIGHT = 50             # Расстояние между строками цитаты
+    LINE_HEIGHT = 50
 
     # --- Цвета ---
-    BACKGROUND_COLOR = "white"   # Цвет фона карточки
-
-    NAME_COLOR = "black"         # Цвет имени
-    DATE_COLOR = "#777777"       # Цвет даты
-    TEXT_COLOR = "black"         # Цвет основного текста
+    NAME_COLOR = "black"
+    DATE_COLOR = "#777777"
+    TEXT_COLOR = "black"
 
     # --- Шрифт ---
     FONT_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "fonts",
-    "NotoSans_Condensed-Regular.ttf"
+        os.path.dirname(os.path.abspath(__file__)),
+        "fonts",
+        "NotoSans-Regular.ttf"
     )
 
     # ============================================================
-    # ГЕНЕРАЦИЯ КАРТИНКИ
+    # ГЕНЕРАЦИЯ ШРИФТОВ
     # ============================================================
 
     name_font = ImageFont.truetype(
@@ -256,43 +254,51 @@ def create_quote_image(
 
     text_width = WIDTH - PADDING * 2
 
-def wrap_text(text, font, max_width):
-    lines = []
+    # ============================================================
+    # ПЕРЕНОС ТЕКСТА
+    # ============================================================
 
-    # Обрабатываем каждую строку отдельно,
-    # чтобы сохранять переносы строк из сообщения
-    for paragraph in text.splitlines():
+    def wrap_text(text, font, max_width):
+        lines = []
 
-        # Пустая строка = настоящий абзац
-        if not paragraph.strip():
-            lines.append("")
-            continue
+        # Обрабатываем каждую строку отдельно,
+        # чтобы сохранять переносы строк из сообщения
+        for paragraph in text.splitlines():
 
-        words = paragraph.split()
-        current_line = ""
+            # Пустая строка = настоящий абзац
+            if not paragraph.strip():
+                lines.append("")
+                continue
 
-        for word in words:
-            test_line = (
-                word
-                if not current_line
-                else current_line + " " + word
-            )
+            words = paragraph.split()
+            current_line = ""
 
-            bbox = font.getbbox(test_line)
-            line_width = bbox[2] - bbox[0]
+            for word in words:
+                test_line = (
+                    word
+                    if not current_line
+                    else current_line + " " + word
+                )
 
-            if line_width <= max_width:
-                current_line = test_line
-            else:
-                if current_line:
-                    lines.append(current_line)
+                bbox = font.getbbox(test_line)
+                line_width = bbox[2] - bbox[0]
 
-                current_line = word
+                if line_width <= max_width:
+                    current_line = test_line
+                else:
+                    if current_line:
+                        lines.append(current_line)
 
-        if current_line:
-            lines.append(current_line)
+                    current_line = word
 
-    return lines
+            if current_line:
+                lines.append(current_line)
+
+        return lines
+
+    # ============================================================
+    # ТЕКСТ
+    # ============================================================
 
     if not quote_text.strip():
         quote_text = "[сообщение без текста]"
@@ -312,6 +318,10 @@ def wrap_text(text, font, max_width):
         + text_height
         + PADDING
     )
+
+    # ============================================================
+    # ФОН
+    # ============================================================
 
     if BACKGROUND_PATH:
         background = Image.open(
@@ -345,6 +355,7 @@ def wrap_text(text, font, max_width):
             (WIDTH, height),
             BACKGROUND_COLOR
         )
+
     draw = ImageDraw.Draw(image)
 
     # ============================================================
@@ -410,6 +421,7 @@ def wrap_text(text, font, max_width):
             fill=NAME_COLOR,
             font=name_font
         )
+
     # ============================================================
     # ДАТА
     # ============================================================
@@ -428,6 +440,7 @@ def wrap_text(text, font, max_width):
             fill=DATE_COLOR,
             font=date_font
         )
+
     # ============================================================
     # ТЕКСТ ЦИТАТЫ
     # ============================================================
