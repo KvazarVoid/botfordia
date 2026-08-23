@@ -966,11 +966,15 @@ async def upload_quote_photo(api, image, peer_id):
             f"VK не вернул photo: {upload_result}"
         )
 
-    return await api.photos.save_messages_photo(
+    saved_photo = await api.photos.save_messages_photo(
         server=upload_result["server"],
         photo=upload_result["photo"],
         hash=upload_result["hash"]
-    )
+        )
+
+    print("SAVED PHOTO:", saved_photo)
+
+    return f"photo{saved_photo.owner_id}_{saved_photo.id}"
 
 @bot.on.message()
 async def dice(message):
