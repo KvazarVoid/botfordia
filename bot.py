@@ -1041,25 +1041,8 @@ async def dice(message):
             attachment=photo
         )
 
-        await message.answer(
-            attachment=photo
-        )
-        await message.answer("✅ Картинка создана: test_quote.png")
-
-        print("=== ЦИТАТА ===")
         print(f"Автор: {user_name}")
         print(f"VK ID: {user_id}")
-        print(f"Дата: {quote_date.strftime('%d.%m.%Y %H:%M:%S')}")
-        print(f"Аватар: {avatar_url}")
-        print(f"Текст: {quote_text}")
-        print("==============")
-
-        await message.answer(
-            f"Автор: {user_name}\n"
-            f"VK ID: {user_id}\n"
-            f"Дата: {quote_date.strftime('%d.%m.%Y %H:%M:%S')}\n\n"
-            f"Текст:\n{quote_text}"
-        )
 
         return
 
