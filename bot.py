@@ -19,8 +19,6 @@ from zoneinfo import ZoneInfo
 import json
 from google.oauth2.service_account import Credentials
 
-print("VKBOTTLE VERSION:", vkbottle.__version__)
-
 TOKEN = os.getenv("TOKEN")
 TAGS_CHAT_ID = 2000000004
 STATS_FILE = "/app/data/messages_stats.json"
