@@ -1,6 +1,7 @@
 from vkbottle.bot import Bot
 from vkbottle import API
 from collections import defaultdict
+from vkbottle import PhotoMessageUploader   
 import random
 import re
 import ssl
@@ -60,6 +61,7 @@ tarot_cards = {
 
 bot = Bot(TOKEN)
 api = API(TOKEN)
+photo_uploader = PhotoMessageUploader(bot.api)
 if os.path.exists("credentials.json"):
     gc = gspread.service_account(filename="credentials.json")
 else:
@@ -996,14 +998,20 @@ async def dice(message):
             user_name = f"VK ID {user_id}"
 
         image = create_quote_image(
-        avatar_url=avatar_url,
-        user_name=user_name,
-        quote_date=quote_date,
-        quote_text=quote_text,
+            avatar_url=avatar_url,
+            user_name=user_name,
+            quote_date=quote_date,
+            quote_text=quote_text
         )
 
-        with open("test_quote.png", "wb") as f:
-            f.write(image.getvalue())
+        photo = await photo_uploader.upload(
+            file_source=image.getvalue(),
+            peer_id=message.peer_id
+        )
+
+        await message.answer(
+            attachment=photo
+        )
         await message.answer("✅ Картинка создана: test_quote.png")
 
         print("=== ЦИТАТА ===")
