@@ -313,7 +313,6 @@ def create_quote_image(
         text_font,
         text_width
     )
-    print("TEXT LINES:", repr(text_lines))
 
     text_height = len(text_lines) * LINE_HEIGHT
 
@@ -495,20 +494,21 @@ def create_quote_image(
 
         text_y += LINE_HEIGHT
 
-        # ============================================================
-        # СОХРАНЕНИЕ В ПАМЯТЬ
-        # ============================================================
 
-        output = BytesIO()
+    # ============================================================
+    # СОХРАНЕНИЕ В ПАМЯТЬ
+    # ============================================================
 
-        image.save(
-            output,
-            format="PNG"
-        )
+    output = BytesIO()
 
-        output.seek(0)
+    image.save(
+        output,
+        format="PNG"
+    )
 
-        return output
+    output.seek(0)
+
+    return output
 
 @bot.on.message(text="/id")
 async def get_chat_id(message):
