@@ -230,7 +230,7 @@ def create_quote_image(
     FONT_PATH = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
         "fonts",
-        "NotoSans-Regular.ttf"
+        "NotoSans_Condensed-Regular.ttf"
     )
 
     # ============================================================
@@ -239,7 +239,7 @@ def create_quote_image(
 
     print("FONT_PATH:", FONT_PATH)
     print("FONT EXISTS:", os.path.exists(FONT_PATH))
-    
+
     name_font = ImageFont.truetype(
         FONT_PATH,
         NAME_SIZE
