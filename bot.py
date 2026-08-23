@@ -961,6 +961,11 @@ async def upload_quote_photo(api, image, peer_id):
 
             upload_result = json.loads(raw)
 
+    if not upload_result.get("photo"):
+        raise RuntimeError(
+            f"VK не вернул photo: {upload_result}"
+        )
+
     return await api.photos.save_messages_photo(
         server=upload_result["server"],
         photo=upload_result["photo"],
