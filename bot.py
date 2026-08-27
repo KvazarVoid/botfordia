@@ -149,7 +149,7 @@ def get_message_statistics(period):
 
     periods = {
         "день": 1,
-        "неделю": 7,
+        "неделя": 7,
         "месяц": 30,
         "год": 365
     }
