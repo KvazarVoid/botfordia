@@ -28,6 +28,72 @@ TAGS_UPDATE_INTERVAL = 6 * 60 * 60
 BACKGROUND_PATH = "/app/data/quote_background.jpg"
 waiting_for_background = set()
 
+# ============================================================
+# СНАРЯЖЕНИЕ
+# ============================================================
+
+# Путь к файлу на Railway
+RAILWAY_EQUIPMENT_FILE = "/app/data/equipment.json"
+
+# Путь к файлу при запуске на обычном ПК.
+# Файл будет находиться в папке:
+# bot.py
+# data/
+#     equipment.json
+LOCAL_EQUIPMENT_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "data",
+    "equipment.json"
+)
+
+# Если существует /app — считаем, что бот запущен на Railway.
+# Иначе используем локальный путь.
+if os.path.exists("/app"):
+    EQUIPMENT_FILE = RAILWAY_EQUIPMENT_FILE
+else:
+    EQUIPMENT_FILE = LOCAL_EQUIPMENT_FILE
+
+
+def load_equipment():
+    """
+    Загружает списки снаряжения из JSON.
+
+    Если файла ещё нет, возвращается пустой словарь.
+    """
+    if not os.path.exists(EQUIPMENT_FILE):
+        return {}
+
+    try:
+        with open(EQUIPMENT_FILE, "r", encoding="utf-8") as file:
+            return json.load(file)
+
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_equipment(equipment):
+    """
+    Сохраняет списки снаряжения в JSON.
+    """
+
+    # Создаём папку data, если её ещё нет.
+    os.makedirs(
+        os.path.dirname(EQUIPMENT_FILE),
+        exist_ok=True
+    )
+
+    with open(EQUIPMENT_FILE, "w", encoding="utf-8") as file:
+        json.dump(
+            equipment,
+            file,
+            ensure_ascii=False,
+            indent=2
+        )
+
+
+# Загружаем существующие списки при запуске бота.
+equipment_lists = load_equipment()
+
 ssl._create_default_https_context = lambda: ssl.create_default_context(
     cafile=certifi.where()
 )
@@ -149,7 +215,7 @@ def get_message_statistics(period):
 
     periods = {
         "день": 1,
-        "неделя": 7,
+        "неделю": 7,
         "месяц": 30,
         "год": 365
     }
@@ -862,21 +928,9 @@ def load_message_stats():
     except (json.JSONDecodeError, OSError):
         return []
 
-def load_message_stats():
-    if not os.path.exists(STATS_FILE):
-        return []
-
-    try:
-        with open(STATS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return []
-
-
 def save_message_stats(stats):
     with open(STATS_FILE, "w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False)
-
 
 def record_message(message):
     if message.peer_id != TAGS_CHAT_ID:
@@ -1000,11 +1054,401 @@ async def upload_quote_photo(api, image, peer_id, max_attempts=3):
                 raise
             
 @bot.on.message()
+@bot.on.message()
 async def dice(message):
     print(message.from_id)
     record_message(message)
 
     text = (message.text or "").lower().strip()
+
+        # ============================================================
+    # СЛУЧАЙНЫЕ ХАРАКТЕРИСТИКИ
+    # ============================================================
+
+    if text.startswith("/статы"):
+
+        parts = text.split()
+
+        # --------------------------------------------------------
+        # /статы
+        # Показываем справку
+        # --------------------------------------------------------
+
+        if len(parts) == 1:
+
+            await message.answer(
+                "🎲 Случайные характеристики\n\n"
+                "/статы <максимум> <начальное значение> <очки на распределение>\n"
+                "Если все характеристики уже достигли максимума,\n"
+                "лишние очки не используются.\n\n"
+                "Если хотите создать Совершенного, введите 10 1 63.\n" \
+                "Отверженного — 7 1 30."
+            )
+            return
+
+        # --------------------------------------------------------
+        # Проверяем количество параметров
+        # --------------------------------------------------------
+
+        if len(parts) != 4:
+            await message.answer(
+                "❌ Используй:\n"
+                "/статы <максимум> <начальное значение> <очки>"
+            )
+            return
+
+        try:
+            max_stat = int(parts[1])
+            start_stat = int(parts[2])
+            points = int(parts[3])
+
+        except ValueError:
+            await message.answer(
+                "❌ Все три параметра должны быть числами."
+            )
+            return
+
+        # --------------------------------------------------------
+        # Проверяем значения
+        # --------------------------------------------------------
+
+        if max_stat < start_stat:
+            await message.answer(
+                "❌ Максимум не может быть меньше стартового значения."
+            )
+            return
+
+        if points < 0:
+            await message.answer(
+                "❌ Количество очков не может быть отрицательным."
+            )
+            return
+
+        # --------------------------------------------------------
+        # Начальные характеристики
+        # --------------------------------------------------------
+
+        stat_names = [
+            "Сила",
+            "Ловкость",
+            "Выносливость",
+            "Восприятие",
+            "Интеллект",
+            "Харизма",
+            "Удача"
+        ]
+
+        stats = {
+            stat: start_stat
+            for stat in stat_names
+        }
+
+        # --------------------------------------------------------
+        # Случайное распределение очков
+        #
+        # Каждое очко отправляется в случайную характеристику,
+        # которая ещё не достигла максимума.
+        #
+        # Если свободных мест больше нет — оставшиеся очки
+        # просто не используются.
+        # --------------------------------------------------------
+
+        for _ in range(points):
+
+            available_stats = [
+                stat
+                for stat in stat_names
+                if stats[stat] < max_stat
+            ]
+
+            # Все характеристики уже достигли максимума.
+            if not available_stats:
+                break
+
+            stat = random.choice(
+                available_stats
+            )
+
+            stats[stat] += 1
+
+        # --------------------------------------------------------
+        # Вывод результата
+        # --------------------------------------------------------
+
+        result_text = "\n".join(
+            f"{stat}: {stats[stat]}"
+            for stat in stat_names
+        )
+
+        await message.answer(
+            "🎲 Характеристики\n\n"
+            + result_text
+        )
+
+        return
+
+    # ============================================================
+    # СНАРЯЖЕНИЕ
+    # ============================================================
+
+    if text.startswith("/снаряжение"):
+
+        # ID чата.
+        # У каждого чата будет свой отдельный список.
+        peer_id = str(message.peer_id)
+
+        # Если списка для этого чата ещё нет —
+        # создаём пустой.
+        equipment = equipment_lists.setdefault(
+            peer_id,
+            []
+        )
+
+        # --------------------------------------------------------
+        # /снаряжение N
+        # Получить N случайных предметов
+        # --------------------------------------------------------
+
+        parts = text.split()
+
+        if len(parts) == 2 and parts[1].isdigit():
+
+            count = int(parts[1])
+
+            if count <= 0:
+                await message.answer(
+                    "❌ Количество предметов должно быть больше нуля."
+                )
+                return
+
+            if not equipment:
+                await message.answer(
+                    "❌ Список снаряжения пуст."
+                )
+                return
+
+            if count > len(equipment):
+                await message.answer(
+                    f"❌ В списке только {len(equipment)} "
+                    f"{'предмет' if len(equipment) == 1 else 'предмета' if 2 <= len(equipment) <= 4 else 'предметов'}."
+                )
+                return
+
+            # random.sample выбирает предметы без повторений.
+            selected_items = random.sample(
+                equipment,
+                count
+            )
+
+            result_text = "\n".join(
+                f"{i}. {item}"
+                for i, item in enumerate(
+                    selected_items,
+                    start=1
+                )
+            )
+
+            await message.answer(result_text)
+            return
+
+        # --------------------------------------------------------
+        # /снаряжение показать
+        # --------------------------------------------------------
+
+        if text == "/снаряжение показать":
+
+            if not equipment:
+                await message.answer(
+                    "📦 Список снаряжения пуст."
+                )
+                return
+
+            result_text = "\n".join(
+                f"{i}. {item}"
+                for i, item in enumerate(
+                    equipment,
+                    start=1
+                )
+            )
+
+            await message.answer(result_text)
+            return
+
+        # --------------------------------------------------------
+        # /снаряжение сброс
+        # --------------------------------------------------------
+
+        if text == "/снаряжение сброс":
+
+            equipment.clear()
+
+            save_equipment(equipment_lists)
+
+            await message.answer(
+                "🗑 Список снаряжения очищен."
+            )
+            return
+
+        # --------------------------------------------------------
+        # /снаряжение добавить
+        #
+        # Каждый перенос строки = отдельный предмет.
+        # --------------------------------------------------------
+
+        if text.startswith("/снаряжение добавить"):
+
+            # Здесь впервые берём оригинальный текст.
+            # В нём сохраняется регистр букв.
+            original_text = message.text or ""
+
+            lines = original_text.splitlines()
+
+            if len(lines) < 2:
+                await message.answer(
+                    "❌ После команды нужно указать предметы, "
+                    "каждый с новой строки.\n\n"
+                    "Пример:\n"
+                    "/снаряжение добавить\n"
+                    "Меч\n"
+                    "Щит\n"
+                    "Зелье здоровья"
+                )
+                return
+
+            added_items = []
+
+            for line in lines[1:]:
+
+                item = line.strip()
+
+                # Пустые строки игнорируем.
+                if item:
+                    added_items.append(item)
+
+            if not added_items:
+                await message.answer(
+                    "❌ Не найдено ни одного предмета."
+                )
+                return
+
+            # Добавляем все найденные предметы.
+            equipment.extend(added_items)
+
+            # Сохраняем изменения в JSON.
+            save_equipment(equipment_lists)
+
+            await message.answer(
+                f"✅ Добавлено предметов: {len(added_items)}.\n"
+                f"📦 Всего в списке: {len(equipment)}."
+            )
+            return
+
+        # --------------------------------------------------------
+        # /снаряжение удалить N N N
+        # --------------------------------------------------------
+
+        if text.startswith("/снаряжение удалить"):
+
+            # Берём всё после названия команды
+            # и извлекаем из него числа.
+            numbers_text = text[
+                len("/снаряжение удалить"):
+            ]
+
+            delete_numbers = re.findall(
+                r"\d+",
+                numbers_text
+            )
+
+            if not delete_numbers:
+                await message.answer(
+                    "❌ Укажи номера предметов.\n\n"
+                    "Пример:\n"
+                    "/снаряжение удалить 2 5 7"
+                )
+                return
+
+            # Преобразуем номера в int,
+            # убираем дубликаты
+            # и сортируем от большего к меньшему.
+            indexes = sorted(
+                set(
+                    int(number)
+                    for number in delete_numbers
+                ),
+                reverse=True
+            )
+
+            # Проверяем существование всех номеров.
+            invalid_numbers = [
+                index
+                for index in indexes
+                if index < 1 or index > len(equipment)
+            ]
+
+            if invalid_numbers:
+                await message.answer(
+                    "❌ Неверные номера: "
+                    + ", ".join(
+                        map(str, invalid_numbers)
+                    )
+                )
+                return
+
+            deleted_items = []
+
+            # Удаляем с конца списка,
+            # чтобы индексы остальных предметов
+            # не сдвигались.
+            for index in indexes:
+
+                deleted_items.append(
+                    equipment.pop(index - 1)
+                )
+
+            # Сохраняем изменения.
+            save_equipment(equipment_lists)
+
+            # Возвращаем удалённые предметы
+            # в исходном порядке.
+            deleted_items.reverse()
+
+            await message.answer(
+                "🗑 Удалено:\n"
+                + "\n".join(
+                    f"• {item}"
+                    for item in deleted_items
+                )
+                + f"\n\n📦 Осталось предметов: {len(equipment)}."
+            )
+            return
+
+        # --------------------------------------------------------
+        # /снаряжение
+        # Показываем список всех доступных команд
+        # --------------------------------------------------------
+
+        await message.answer(
+            "🎒 Снаряжение\n\n"
+            "/снаряжение <число> — "
+            "получить указанное количество случайных предметов "
+            "без повторений.\n\n"
+
+            "/снаряжение добавить — "
+            "добавить предметы в список. "
+            "Каждый предмет указывается с новой строки.\n\n"
+
+            "/снаряжение показать — "
+            "показать весь список снаряжения с номерами.\n\n"
+
+            "/снаряжение удалить <номера> — "
+            "удалить один или несколько предметов по их номерам.\n"
+            "Например: /снаряжение удалить 2 5 7\n\n"
+
+            "/снаряжение сброс — "
+            "полностью очистить список снаряжения."
+        )
+        return
 
     # ============================================================
     # СМЕНА ФОНА ЦИТАТ
@@ -1082,7 +1526,13 @@ async def dice(message):
             )
 
         return
+
+    # ============================================================
+    # ЦИТАТА
+    # ============================================================
+
     if text == "/цитата":
+
         reply = message.reply_message
 
         if not reply:
@@ -1094,15 +1544,19 @@ async def dice(message):
         # Данные сообщения
         quote_text = reply.text or ""
         user_id = reply.from_id
-        quote_date = reply.date.replace(tzinfo=ZoneInfo("UTC")).astimezone(
+
+        quote_date = reply.date.replace(
+            tzinfo=ZoneInfo("UTC")
+        ).astimezone(
             ZoneInfo("Europe/Kyiv")
         )
+
         # Получаем имя пользователя
         try:
             users = await api.users.get(
-    user_ids=[user_id],
-    fields=["photo_200"]
-)
+                user_ids=[user_id],
+                fields=["photo_200"]
+            )
 
             if users:
                 user = users[0]
@@ -1115,6 +1569,7 @@ async def dice(message):
         except Exception as e:
             print(f"Ошибка получения пользователя: {e}")
             user_name = f"VK ID {user_id}"
+            avatar_url = None
 
         image = create_quote_image(
             avatar_url=avatar_url,
@@ -1126,31 +1581,46 @@ async def dice(message):
         image.name = "quote.png"
 
         photo = await upload_quote_photo(
-        api=api,
-        image=image,
-        peer_id=message.peer_id
+            api=api,
+            image=image,
+            peer_id=message.peer_id
         )
 
         await message.answer(
             attachment=photo
         )
 
-
         return
 
+    # ============================================================
+    # ОБНОВЛЕНИЕ ТЕГОВ
+    # ============================================================
+
     if text == "/обновитьтеги":
+
         update_tracked_tags()
 
         await message.answer(
             f"✅ Список тегов обновлён.\n"
             f"Загружено тегов: {len(tracked_tags)}"
         )
+
         return
 
+    # ============================================================
+    # СТАТИСТИКА СООБЩЕНИЙ
+    # ============================================================
+
     if text.startswith("/сообщения"):
+
         args = text.split()
 
-        if len(args) != 2 or args[1] not in {"день", "неделя", "месяц", "год"}:
+        if len(args) != 2 or args[1] not in {
+            "день",
+            "неделя",
+            "месяц",
+            "год"
+        }:
             await message.answer(
                 "Использование:\n"
                 "/сообщения день\n"
@@ -1162,7 +1632,9 @@ async def dice(message):
 
         period = args[1]
 
-        start, end, total, author_counts = get_message_statistics(period)
+        start, end, total, author_counts = get_message_statistics(
+            period
+        )
 
         if period == "день":
             date_text = end.strftime("%d.%m.%Y")
@@ -1179,12 +1651,18 @@ async def dice(message):
         )
 
         if author_counts:
+
             text_result += "\n\n👤 По авторам:"
 
-            user_ids = [int(user_id) for user_id in author_counts.keys()]
+            user_ids = [
+                int(user_id)
+                for user_id in author_counts.keys()
+            ]
 
             try:
-                users = await api.users.get(user_ids=user_ids)
+                users = await api.users.get(
+                    user_ids=user_ids
+                )
 
                 names = {
                     str(user.id): f"{user.first_name} {user.last_name}"
@@ -1195,12 +1673,26 @@ async def dice(message):
                 names = {}
 
             for user_id, count in author_counts.items():
-                name = names.get(user_id, f"VK {user_id}")
-                text_result += f"\n{name} — {count}"
+
+                name = names.get(
+                    user_id,
+                    f"VK {user_id}"
+                )
+
+                text_result += (
+                    f"\n{name} — {count}"
+                )
+
         await message.answer(text_result)
+
         return
 
+    # ============================================================
+    # ДЕДЛАЙНЫ
+    # ============================================================
+
     if text.startswith("/дедлайн"):
+
         args = text.split()
 
         if len(args) > 1:
@@ -1210,12 +1702,21 @@ async def dice(message):
             result = get_deadlines()
 
         await message.answer(result)
+
         return
+
+    # ============================================================
+    # ПРОВЕРКА АДМИНСКИХ ТЕГОВ
+    # ============================================================
 
     admin_ids, admin_tags = get_admin_data()
 
     if message.from_id in admin_ids:
-        own_tags = admin_tags.get(message.from_id, [])
+
+        own_tags = admin_tags.get(
+            message.from_id,
+            []
+        )
 
         message_has_own_tag = any(
             tag.lower() in message.text.lower()
@@ -1223,54 +1724,96 @@ async def dice(message):
         )
 
         if message_has_own_tag:
-            update_sheet(message.text, message.from_id)
+            update_sheet(
+                message.text,
+                message.from_id
+            )
         else:
             await update_player_response(message)
+
     else:
         await update_player_response(message)
+
+    # ============================================================
+    # ПРОСТЫЕ КОМАНДЫ
+    # ============================================================
 
     commands = {
         "/магнус": "Предатель*",
         "/пасхалко": "Пасхалко",
         "/фумо": "https://ru.wikipedia.org/wiki/Смысл_жизни",
-        "/диа": "ЛУЧШАЯ РОЛЕВАЯ В МИРЕ\nЛУЧШАЯ РОЛЕВАЯ В МИРЕ\nЛУЧШАЯ РОЛЕВАЯ В МИРЕ",
-        "/помощь": "/кх, /дх или /dх — бросок куба, где Х количество граней.\n/сообщения — количество сообщений за выбранный период.\n/дедлайны — дедлайны. Зелёный кружок отмечает ветки со всеми отписанными постами игроков."
-}    
-    
+        "/диа": (
+            "ЛУЧШАЯ РОЛЕВАЯ В МИРЕ\n"
+            "ЛУЧШАЯ РОЛЕВАЯ В МИРЕ\n"
+            "ЛУЧШАЯ РОЛЕВАЯ В МИРЕ"
+        ),
+        "/помощь": (
+            "/кх, /дх или /dх — бросок куба, где Х количество граней.\n"
+            "/сообщения — количество сообщений за выбранный период.\n"
+            "/дедлайны — дедлайны. "
+            "Зелёный кружок отмечает ветки со всеми "
+            "отписанными постами игроков."
+        )
+    }
+
+    if text in commands:
+
+        await message.answer(
+            commands[text]
+        )
+
+        return
+
+    # ============================================================
+    # КАЗИНО
+    # ============================================================
+
     casino_commands = {
         "/казино": "normal",
         "/деп": "deposit",
         "/slot": "slot"
     }
-    if text in commands:
-        await message.answer(commands[text])
-        return
 
     mode = None
 
     for cmd in casino_commands:
+
         if text.startswith(cmd):
             mode = casino_commands[cmd]
             break
 
     if mode:
+
         parts = text.split()
+
         count = 1
 
         if len(parts) > 1 and parts[1].isdigit():
             count = int(parts[1])
 
         MAX_ROLLS = 50
+
         if count > MAX_ROLLS:
-            await message.answer(f"Слишком много попыток (макс {MAX_ROLLS})")
+
+            await message.answer(
+                f"Слишком много попыток (макс {MAX_ROLLS})"
+            )
+
             return
 
-        ping = await get_ping(message, api)
+        ping = await get_ping(
+            message,
+            api
+        )
 
         groups = defaultdict(list)
 
         for _ in range(count):
-            roll = random.randint(1, 1000)
+
+            roll = random.randint(
+                1,
+                1000
+            )
 
             if roll <= 5:
                 result_text = "!!!Легендарка!!!"
@@ -1285,7 +1828,9 @@ async def dice(message):
             else:
                 result_text = "Целое нихуя"
 
-            groups[result_text].append(roll)
+            groups[result_text].append(
+                roll
+            )
 
         output = []
 
@@ -1299,60 +1844,102 @@ async def dice(message):
         ]
 
         for name in order:
+
             if name in groups:
+
                 rolls = groups[name]
+
                 output.append(
-                    f"{len(rolls)}x {name} ({', '.join(map(str, rolls))})"
+                    f"{len(rolls)}x {name} "
+                    f"({', '.join(map(str, rolls))})"
                 )
 
         await message.answer(
             f"{ping}\n"
-            f"Казино x{count}:\n\n" +
-            "\n".join(output)
+            f"Казино x{count}:\n\n"
+            + "\n".join(output)
         )
 
         return
-    
+
+    # ============================================================
+    # ТАРО
+    # ============================================================
+
     if text == "/расклад":
 
         results = []
 
-        rolls = random.sample(range(1, 24), 3)
+        rolls = random.sample(
+            range(1, 24),
+            3
+        )
 
         for roll in rolls:
-            card = tarot_cards.get(roll, "Неизвестная карта")
-            results.append(f"{roll} — {card}")
-        ping = await get_ping(message, api)
+
+            card = tarot_cards.get(
+                roll,
+                "Неизвестная карта"
+            )
+
+            results.append(
+                f"{roll} — {card}"
+            )
+
+        ping = await get_ping(
+            message,
+            api
+        )
+
         await message.answer(
             f"{ping}\n"
-            f"🃏 Карты:\n" +
-            "\n".join(results)
+            f"🃏 Карты:\n"
+            + "\n".join(results)
         )
+
         return
-    
+
+    # ============================================================
+    # СМЕРТЬ
+    # ============================================================
+
     if text.startswith("/смерть"):
 
         parts = text.split()
 
-        # модификатор (по умолчанию 0)
+        # Модификатор по умолчанию 0
         modifier = 0
 
         if len(parts) > 1:
+
             try:
                 modifier = int(parts[1])
             except ValueError:
                 modifier = 0
 
-        roll = random.randint(1, 20)
+        roll = random.randint(
+            1,
+            20
+        )
+
         total = roll + modifier
 
-        mod_text = f"+{modifier}" if modifier >= 0 else str(modifier)
+        mod_text = (
+            f"+{modifier}"
+            if modifier >= 0
+            else str(modifier)
+        )
 
         if total <= 20:
             result_text = "Мои соболезнования."
-        elif total > 20:
+        else:
             result_text = "Мать вашу, оно живёт!"
-        ping = await get_ping(message, api)
+
+        ping = await get_ping(
+            message,
+            api
+        )
+
         await message.answer(
             f"{ping}\n"
             f"Ухх, бля, поехали\n"
@@ -1362,30 +1949,67 @@ async def dice(message):
         )
 
         return
+
+    # ============================================================
+    # ОБЫЧНЫЕ КУБЫ
+    # ============================================================
+
     text = message.text.lower().strip()
 
-    match = re.fullmatch(r"/(\d*)(?:к|d|д)(\d+)([+-]\d+)?", text)
-    match = re.fullmatch(r"/(\d*)(?:к|d|д)(\d+)([+-]\d+)?", text)
+    match = re.fullmatch(
+        r"/(\d*)(?:к|d|д)(\d+)([+-]\d+)?",
+        text
+    )
 
     if match:
 
-        count = int(match.group(1) or 1)
-        MAX_DICE = 10
-        if count > MAX_DICE:
-            await message.answer(f"Много хочешь (макс {MAX_DICE})")
-            return
-        sides = int(match.group(2))
-        modifier = int(match.group(3) or 0)
+        count = int(
+            match.group(1) or 1
+        )
 
-        rolls = [random.randint(1, sides) for _ in range(count)]
+        MAX_DICE = 10
+
+        if count > MAX_DICE:
+
+            await message.answer(
+                f"Много хочешь (макс {MAX_DICE})"
+            )
+
+            return
+
+        sides = int(
+            match.group(2)
+        )
+
+        modifier = int(
+            match.group(3) or 0
+        )
+
+        rolls = [
+            random.randint(1, sides)
+            for _ in range(count)
+        ]
+
         total = sum(rolls) + modifier
 
-        rolls_text = " + ".join(map(str, rolls))
+        rolls_text = " + ".join(
+            map(str, rolls)
+        )
 
         mod_text = ""
+
         if modifier:
-            sign = "+ " if modifier > 0 else ""
-            mod_text = f" {sign}{modifier}"
+
+            sign = (
+                "+ "
+                if modifier > 0
+                else ""
+            )
+
+            mod_text = (
+                f" {sign}{modifier}"
+            )
+
         reply = message.reply_message
 
         if reply:
@@ -1393,13 +2017,16 @@ async def dice(message):
         else:
             user_id = message.from_id
 
-        ping = await get_ping(message, api)
+        ping = await get_ping(
+            message,
+            api
+        )
 
         await message.answer(
-        f"{ping}\n"
-        f"🎲 {count}к{sides}\n"
-        f"[ {rolls_text}{mod_text} ]\n"
-        f"Σ = {total}"
-)
+            f"{ping}\n"
+            f"🎲 {count}к{sides}\n"
+            f"[ {rolls_text}{mod_text} ]\n"
+            f"Σ = {total}"
+        )
 update_tracked_tags()
 bot.run()
